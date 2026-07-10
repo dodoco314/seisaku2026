@@ -29,6 +29,7 @@ async function sendMessage(): Promise<void> {
         const reply = await window.api.chat(msg)
         addMessage('みまもるくん', reply)
     } catch (error) {
+        console.error('チャットエラー:', error)
         addMessage('みまもるくん', 'エラーが発生しました。もう一度お試しください。')
     }
 }

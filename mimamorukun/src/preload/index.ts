@@ -80,15 +80,14 @@ const api = {
         }
       }[]
     > => ipcRenderer.invoke('discord:calcScores', guildId),
-
-    // ─── みまもるくん チャット系 ──────────────────────────
+  },
+   // ─── みまもるくん チャット系 ──────────────────────────
 
   // メッセージを送信して返答を取得
   chat: (message: string, userId: string = 'default'): Promise<string> =>
     ipcRenderer.invoke('chat:send', message, userId)
   }
-  
-}
+
 
 if (process.contextIsolated) {
   try {

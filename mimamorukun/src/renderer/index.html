@@ -16,6 +16,12 @@
       li { margin: 8px 0; }
       select { padding: 6px; margin: 4px; }
       p { margin: 8px 0; }
+
+      body {
+        overflow-x: hidden;
+        overflow-y: auto !important;
+      }
+
       #meterWrapper {
         display: flex;
         align-items: center;
@@ -42,21 +48,29 @@
         min-width: 50px;
         text-align: right;
       }
+
       /* チャット追加分 */
       #chat-container {
-        margin: 16px 0;
-        border: 1px solid #ccc;
-        border-radius: 8px;
+        max-width: 100%;
+        box-sizing: border-box;
         overflow: hidden;
-        background: #ffffff;
-        color: #000000;
       }
+
       #chat {
         height: 300px;
         overflow-y: auto;
         padding: 12px;
         background: #ffffff;
         color: #000000;
+        word-break: break-word;  /* 長い文字を折り返す */
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+      }
+
+      #chat p {
+        margin: 8px 0;
+        word-break: break-word;
+        overflow-wrap: break-word;
       }
       #chat-input-area {
         display: flex;
