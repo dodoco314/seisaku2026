@@ -54,16 +54,22 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
     console.log('スコアエントリ:', scoresEntries)
 
     // 統計情報を表示
+    const totalScore = scoresEntries.reduce((sum, [, score]) => sum + score, 0)
+
+    const medals = ['🥇', '🥈', '🥉']
+
     const scoresHTML = scoresEntries
       .sort((a, b) => b[1] - a[1])
       .map(
-        ([user, score]) =>
-          `<li style="margin: 8px 0; padding: 8px; background: #f3f4f6; border-radius: 4px; color: #000;">
-            <strong>${user}:</strong> ${score.toFixed(4)}%
+        ([user, score], index) => {
+          const contribution = totalScore > 0 ? (score / totalScore) * 100 : 0
+          const medal = medals[index] ?? ''
+          return `<li style="margin: 8px 0; padding: 8px; background: #f3f4f6; border-radius: 4px; color: #000;">
+            <strong>${user}:</strong> ${contribution.toFixed(1)}% ${medal}
           </li>`
+        }
       )
       .join('')
-
     console.log('生成されたHTML:', scoresHTML)
 
    statsContainer.innerHTML = `
