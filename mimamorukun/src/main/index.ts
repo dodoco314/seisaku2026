@@ -168,12 +168,27 @@ app.whenReady().then(async () => {
   }
 
   const result = calculateDistortion(
-    repoData.commits.byUser,
-    repoData.branches.byUser,
-    discordScores,
-    excludedUsers
+  repoData.commits.byUser,
+  repoData.branches.byUser,
+  discordScores,
+  excludedUsers
   )
-  return result
+
+  // 総コミット数（github-data.jsonから）
+  const totalCommits = repoData.commits.total
+
+  // 総発言数（DiscordのmessageCountの合計）
+  let totalMessages = 0
+  if (guildId) {
+    try {
+      const discordData = await calcDiscordScores(guildId)
+      totalMessages = discordData.reduce((sum, u) => sum + u.breakdown.messageCount, 0)
+    } catch (e) {
+      console.warn('総発言数の取得に失敗しました:', e)
+    }
+  }
+
+  return { ...result, totalCommits, totalMessages }
 })
   // ─── Discord OAuth認証系 ───────────────────────────
   // 保存済みDiscordトークン確認（ユーザー情報のみ返す。トークン自体はrendererに渡さない）

@@ -66,16 +66,16 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
 
     console.log('生成されたHTML:', scoresHTML)
 
-    statsContainer.innerHTML = `
-      <div style="margin: 16px 0;">
-        <h3 style="color: inherit;">統計情報</h3>
-        <p style="color: inherit;"><strong>平均スコア:</strong> ${data.avgScore.toFixed(4)}</p>
-        <p style="color: inherit;"><strong>標準偏差:</strong> ${data.stdDev.toFixed(4)}</p>
-        <h3 style="color: inherit;">メンバーのスコア</h3>
-        <ul style="list-style: none; padding: 0;">
-          ${scoresHTML}
-        </ul>
-      </div>
+   statsContainer.innerHTML = `
+    <div style="margin: 16px 0;">
+      <h3 style="color: inherit;">統計情報</h3>
+      <p style="color: inherit;"><strong>総コミット数:</strong> ${data.totalCommits}件</p>
+      <p style="color: inherit;"><strong>総発言数:</strong> ${data.totalMessages}件</p>
+      <h3 style="color: inherit;">メンバーのスコア</h3>
+      <ul style="list-style: none; padding: 0;">
+        ${scoresHTML}
+      </ul>
+    </div>
     `
   } catch (error) {
     console.error('崩壊度の計算に失敗しました:', error)

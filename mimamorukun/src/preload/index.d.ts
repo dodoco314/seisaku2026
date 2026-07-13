@@ -23,8 +23,8 @@ declare global {
         avgScore: number
         stdDev: number
         distortion: number
-    
-    
+        totalCommits: number
+        totalMessages: number
       }>
 
       // みまもるくん チャット系
