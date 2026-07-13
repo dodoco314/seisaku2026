@@ -129,14 +129,41 @@ app.whenReady().then(async () => {
     return getOutputPath()
   })
   // リポジトリのデータから崩壊度を計算
-  ipcMain.handle('github:calculateDistortion', async (_, repoName: string) => {
-    const outputPath = getOutputPath()
-    const data = JSON.parse(readFileSync(outputPath, 'utf-8'))
-    if (!data[repoName]) throw new Error(`データが見つかりません: ${repoName}`)
-    const repoData = data[repoName]
-    return calculateDistortion(repoData.commits.byUser, repoData.branches.byUser)
-  })
+  ipcMain.handle('github:calculateDistortion', async (_, repoName: string, guildId?: string) => {
+  const outputPath = getOutputPath()
+  const data = JSON.parse(readFileSync(outputPath, 'utf-8'))
 
+  if (!data[repoName]) {
+    throw new Error(`データが見つかりません: ${repoName}`)
+  }
+
+  const repoData = data[repoName]
+
+  // Discordスコアを取得（guildIdがある場合のみ）
+  let discordScores: Record<string, number> | undefined = undefined
+
+  if (guildId) {
+    try {
+      const links = await getAccountLinks(repoName)
+      const discordData = await calcDiscordScores(guildId)
+
+      discordScores = {}
+      for (const link of links) {
+        if (link.discord_user_id) {
+          const discordUser = discordData.find((d) => d.author_id === link.discord_user_id)
+          if (discordUser) {
+            discordScores[link.github_username] = discordUser.score
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Discordスコア取得失敗、GitHubのみで計算します:', e)
+    }
+  }
+
+  const result = calculateDistortion(repoData.commits.byUser, repoData.branches.byUser, discordScores)
+  return result
+})
   // ─── Discord OAuth認証系 ───────────────────────────
   // 保存済みDiscordトークン確認（ユーザー情報のみ返す。トークン自体はrendererに渡さない）
   ipcMain.handle('discord:getUser', async () => await getSavedDiscordUser())

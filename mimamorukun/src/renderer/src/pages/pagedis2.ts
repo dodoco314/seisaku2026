@@ -102,7 +102,7 @@ export function setupPageDis2(): void {
     }
 
     // 紐付け保存後に崩壊度メーター画面へ
-    await renderDistortionMeter(selectedRepoName)
+    await renderDistortionMeter(selectedRepoName, selectedGuildId)
     showPage('pageresult')
   })
 

@@ -12,7 +12,7 @@ let currentDistortionData: DistortionData | null = null
 let currentRepoName: string | null = null
 
 //htmlの要素をjavascriptで取得する
-export async function renderDistortionMeter(repoName: string): Promise<void> {
+export async function renderDistortionMeter(repoName: string, guildId?: string): Promise<void> {
   const meter = document.getElementById('distortionMeter')
   const meterFill = document.getElementById('meterFill')
   const meterLabel = document.getElementById('meterLabel')
@@ -26,7 +26,7 @@ export async function renderDistortionMeter(repoName: string): Promise<void> {
   }
 
   try {
-    const data = await window.api.calculateDistortion(repoName)
+    const data = await window.api.calculateDistortion(repoName, guildId)
     currentDistortionData = data
     currentRepoName = repoName
 

@@ -27,13 +27,12 @@ const api = {
   // 選択したリポジトリのデータを取得してJSONに保存
   fetchData: (selectedRepos: string[]): Promise<string> => ipcRenderer.invoke('github:fetch', selectedRepos),
   // 崩壊度を計算
-  calculateDistortion: (repoName: string): Promise<{
+  calculateDistortion: (repoName: string, guildId?: string): Promise<{
     scores: Record<string, number>
     avgScore: number
     stdDev: number
     distortion: number
-  }> => ipcRenderer.invoke('github:calculateDistortion', repoName),
-
+  }> => ipcRenderer.invoke('github:calculateDistortion', repoName, guildId),
   // ─── Discord系 ────────────────────────────────────
   discord: {
     // 認証系（トークン自体はmainプロセスのみ保持、rendererには絶対渡さない）
