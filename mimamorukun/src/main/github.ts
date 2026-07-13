@@ -111,16 +111,21 @@ export function getOutputPath(): string {
 }
 
 // 崩壊度を計算（GitHub・Discord両対応）
+// 崩壊度を計算（GitHub・Discord両対応）
 export function calculateDistortion(
   commits: Record<string, number>,
   branches: Record<string, number>,
-  discordScores?: Record<string, number>
+  discordScores?: Record<string, number>,
+  excludedUsers?: string[]
 ): { scores: Record<string, number>; avgScore: number; stdDev: number; distortion: number } {
 
   const scores: Record<string, number> = {}
   const users = new Set([...Object.keys(commits), ...Object.keys(branches)])
 
   for (const user of users) {
+    // Bot除外リストに含まれるユーザーはスキップ
+    if (excludedUsers?.includes(user)) continue
+
     const commitCount = commits[user] || 0
     const branchCount = branches[user] || 0
     const githubScore = Math.log(commitCount + 1) * 0.7 + Math.log(branchCount + 1) * 0.3
@@ -135,9 +140,10 @@ export function calculateDistortion(
     }
   }
 
-  // Discordのみのユーザーを追加
+  // Discordのみのユーザーを追加（除外リストに含まれない場合のみ）
   if (discordScores) {
     for (const user of Object.keys(discordScores)) {
+      if (excludedUsers?.includes(user)) continue
       if (!scores[user]) {
         scores[user] = discordScores[user] * 0.5
       }

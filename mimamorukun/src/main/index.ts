@@ -139,8 +139,8 @@ app.whenReady().then(async () => {
 
   const repoData = data[repoName]
 
-  // Discordスコアを取得（guildIdがある場合のみ）
   let discordScores: Record<string, number> | undefined = undefined
+  const excludedUsers: string[] = []
 
   if (guildId) {
     try {
@@ -149,6 +149,12 @@ app.whenReady().then(async () => {
 
       discordScores = {}
       for (const link of links) {
+        // BOT_EXCLUDEDが設定されているユーザーは除外リストに追加
+        if (link.discord_user_id === 'BOT_EXCLUDED') {
+          console.log(`[Bot除外] ${link.github_username} をスコア計算から除外します`)
+          excludedUsers.push(link.github_username)
+          continue
+        }
         if (link.discord_user_id) {
           const discordUser = discordData.find((d) => d.author_id === link.discord_user_id)
           if (discordUser) {
@@ -161,7 +167,12 @@ app.whenReady().then(async () => {
     }
   }
 
-  const result = calculateDistortion(repoData.commits.byUser, repoData.branches.byUser, discordScores)
+  const result = calculateDistortion(
+    repoData.commits.byUser,
+    repoData.branches.byUser,
+    discordScores,
+    excludedUsers
+  )
   return result
 })
   // ─── Discord OAuth認証系 ───────────────────────────
