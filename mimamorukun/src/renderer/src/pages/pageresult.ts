@@ -42,21 +42,13 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
       meterFill.style.backgroundColor = '#ef4444'
     }
 
-    // スコアを降順に並べておく（一度だけ）
     const sortedEntries = Object.entries(data.scores).sort((a, b) => b[1] - a[1])
     const totalScore = sortedEntries.reduce((sum, [, score]) => sum + score, 0)
     const medals = ['🥇', '🥈', '🥉']
+    const colors = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899']
 
-    // 初期表示（貢献度）
-    const initialHTML = sortedEntries
-      .map(([user, score], index) => {
-        const contribution = totalScore > 0 ? (score / totalScore) * 100 : 0
-        const medal = medals[index] ?? ''
-        return `<li style="margin: 8px 0; padding: 8px; background: #f3f4f6; border-radius: 4px; color: #000;">
-          <strong>${user}:</strong> ${contribution.toFixed(1)}% ${medal}
-        </li>`
-      })
-      .join('')
+    // 初期表示（貢献度・円グラフ）
+    const initialHTML = buildPieChart(sortedEntries, totalScore, medals, colors, data)
 
     statsContainer.innerHTML = `
       <div style="margin: 16px 0;">
@@ -69,44 +61,29 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
           <button id="tabCommits" style="padding: 6px 16px; border-radius: 4px; border: none; background: #475569; color: white; cursor: pointer;">コミット数</button>
           <button id="tabMessages" style="padding: 6px 16px; border-radius: 4px; border: none; background: #475569; color: white; cursor: pointer;">発言数</button>
         </div>
-        <ul id="scoreList" style="list-style: none; padding: 0;">
-          ${initialHTML}
-        </ul>
+        <div id="scoreList">${initialHTML}</div>
       </div>
     `
 
     const renderTab = (type: 'contribution' | 'commits' | 'messages') => {
-  const list = document.getElementById('scoreList')
-  if (!list) return
+      const list = document.getElementById('scoreList')
+      if (!list) return
 
-  document.getElementById('tabContribution')!.style.background = type === 'contribution' ? '#3b82f6' : '#475569'
-  document.getElementById('tabCommits')!.style.background = type === 'commits' ? '#3b82f6' : '#475569'
-  document.getElementById('tabMessages')!.style.background = type === 'messages' ? '#3b82f6' : '#475569'
+      document.getElementById('tabContribution')!.style.background = type === 'contribution' ? '#3b82f6' : '#475569'
+      document.getElementById('tabCommits')!.style.background = type === 'commits' ? '#3b82f6' : '#475569'
+      document.getElementById('tabMessages')!.style.background = type === 'messages' ? '#3b82f6' : '#475569'
 
-  // タブに応じて並び替え
-  const tabSorted = [...sortedEntries].sort((a, b) => {
-    if (type === 'commits') return (data.commitsByUser[b[0]] ?? 0) - (data.commitsByUser[a[0]] ?? 0)
-    if (type === 'messages') return (data.messagesByUser[b[0]] ?? 0) - (data.messagesByUser[a[0]] ?? 0)
-    return b[1] - a[1]
-  })
+      const tabSorted = [...sortedEntries].sort((a, b) => {
+        if (type === 'commits') return (data.commitsByUser[b[0]] ?? 0) - (data.commitsByUser[a[0]] ?? 0)
+        if (type === 'messages') return (data.messagesByUser[b[0]] ?? 0) - (data.messagesByUser[a[0]] ?? 0)
+        return b[1] - a[1]
+      })
 
-  list.innerHTML = tabSorted.map(([user, score], index) => {
-        const medal = medals[index] ?? ''
-        let value = ''
-
-        if (type === 'contribution') {
-          const contribution = totalScore > 0 ? (score / totalScore) * 100 : 0
-          value = `${contribution.toFixed(1)}%`
-        } else if (type === 'commits') {
-          value = `${data.commitsByUser[user] ?? 0}回`
-        } else {
-          value = `${data.messagesByUser[user] ?? 0}件`
-        }
-
-        return `<li style="margin: 8px 0; padding: 8px; background: #f3f4f6; border-radius: 4px; color: #000;">
-          <strong>${user}:</strong> ${value} ${medal}
-        </li>`
-      }).join('')
+      if (type === 'contribution') {
+        list.innerHTML = buildPieChart(tabSorted, totalScore, medals, colors, data)
+      } else {
+        list.innerHTML = buildBarChart(tabSorted, type, medals, colors, data)
+      }
     }
 
     document.getElementById('tabContribution')?.addEventListener('click', () => renderTab('contribution'))
@@ -119,6 +96,137 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
     meterPercent.innerText = '-'
     statsContainer.innerHTML = '<p style="color: red;">データの計算に失敗しました。</p>'
   }
+}
+
+function buildPieChart(
+  entries: [string, number][],
+  totalScore: number,
+  medals: string[],
+  colors: string[],
+  data: any
+): string {
+  const size = 200
+  const cx = size / 2
+  const cy = size / 2
+  const r = 80
+  let startAngle = -Math.PI / 2
+  let slices = ''
+  let legends = ''
+
+  entries.forEach(([user, score], index) => {
+    const contribution = totalScore > 0 ? score / totalScore : 0
+    const angle = contribution * 2 * Math.PI
+    const endAngle = startAngle + angle
+    const x1 = cx + r * Math.cos(startAngle)
+    const y1 = cy + r * Math.sin(startAngle)
+    const x2 = cx + r * Math.cos(endAngle)
+    const y2 = cy + r * Math.sin(endAngle)
+    const largeArc = angle > Math.PI ? 1 : 0
+    const color = colors[index % colors.length]
+    const medal = medals[index] ?? ''
+
+    slices += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z" fill="${color}" stroke="white" stroke-width="2"/>`
+
+    const midAngle = startAngle + angle / 2
+    const lx = cx + (r * 0.65) * Math.cos(midAngle)
+    const ly = cy + (r * 0.65) * Math.sin(midAngle)
+    slices += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="11" font-weight="bold">${(contribution * 100).toFixed(1)}%</text>`
+
+    legends += `<li style="display:flex;align-items:center;gap:6px;margin:4px 0;color:#fff;">
+      <span style="display:inline-block;width:12px;height:12px;background:${color};border-radius:2px;flex-shrink:0;"></span>
+      ${medal} ${user}
+    </li>`
+
+    startAngle = endAngle
+  })
+
+  const tableRows = entries.map(([user, score], index) => {
+    const contribution = totalScore > 0 ? (score / totalScore) * 100 : 0
+    const medal = medals[index] ?? `${index + 1}位`
+    return `<tr style="border-bottom:1px solid #334155;">
+      <td style="padding:8px;">${medal}</td>
+      <td style="padding:8px;">${user}</td>
+      <td style="padding:8px;text-align:right;">${contribution.toFixed(1)}%</td>
+    </tr>`
+  }).join('')
+
+  return `
+    <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${slices}</svg>
+      <ul style="list-style:none;padding:0;margin:0;">${legends}</ul>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-top:16px;color:#fff;">
+      <thead>
+        <tr style="border-bottom:1px solid #475569;">
+          <th style="padding:8px;text-align:left;">順位</th>
+          <th style="padding:8px;text-align:left;">名前</th>
+          <th style="padding:8px;text-align:right;">貢献度</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `
+}
+
+function buildBarChart(
+  entries: [string, number][],
+  type: 'commits' | 'messages',
+  medals: string[],
+  colors: string[],
+  data: any
+): string {
+  const values = entries.map(([user]) =>
+    type === 'commits' ? (data.commitsByUser[user] ?? 0) : (data.messagesByUser[user] ?? 0)
+  )
+  const maxVal = Math.max(...values, 1)
+  const barWidth = 50
+  const gap = 20
+  const chartH = 160
+  const chartW = entries.length * (barWidth + gap) + gap
+  const unit = type === 'commits' ? '回' : '件'
+
+  let bars = ''
+  entries.forEach(([user], index) => {
+    const val = values[index]
+    const barH = (val / maxVal) * chartH
+    const x = gap + index * (barWidth + gap)
+    const y = chartH - barH
+    const color = colors[index % colors.length]
+    const medal = medals[index] ?? ''
+
+    bars += `
+      <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" fill="${color}" rx="4"/>
+      <text x="${x + barWidth / 2}" y="${y - 6}" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">${val}</text>
+      <text x="${x + barWidth / 2}" y="${chartH + 16}" text-anchor="middle" fill="#fff" font-size="11">${medal}${user}</text>
+    `
+  })
+
+  const tableRows = entries.map(([user], index) => {
+    const val = values[index]
+    const medal = medals[index] ?? `${index + 1}位`
+    return `<tr style="border-bottom:1px solid #334155;">
+      <td style="padding:8px;">${medal}</td>
+      <td style="padding:8px;">${user}</td>
+      <td style="padding:8px;text-align:right;">${val}${unit}</td>
+    </tr>`
+  }).join('')
+
+  return `
+    <svg width="${chartW}" height="${chartH + 40}" viewBox="0 0 ${chartW} ${chartH + 40}" style="overflow:visible;">
+      <line x1="0" y1="${chartH}" x2="${chartW}" y2="${chartH}" stroke="#666" stroke-width="1"/>
+      ${bars}
+    </svg>
+    <table style="width:100%;border-collapse:collapse;margin-top:16px;color:#fff;">
+      <thead>
+        <tr style="border-bottom:1px solid #475569;">
+          <th style="padding:8px;text-align:left;">順位</th>
+          <th style="padding:8px;text-align:left;">名前</th>
+          <th style="padding:8px;text-align:right;">${type === 'commits' ? 'コミット数' : '発言数'}</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `
 }
 
 async function renderCountdown(): Promise<void> {
