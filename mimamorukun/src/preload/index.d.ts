@@ -27,6 +27,12 @@ declare global {
         totalMessages: number
       }>
 
+
+       // 締め切り日管理系
+      saveDeadline: (dateStr: string) => Promise<void>
+      loadDeadline: () => Promise<string | null>
+
+      
       // みまもるくん チャット系
       chat: (message: string, userId?: string) => Promise<string>
 

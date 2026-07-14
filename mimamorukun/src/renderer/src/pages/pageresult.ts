@@ -13,6 +13,9 @@ let currentRepoName: string | null = null
 
 //htmlの要素をjavascriptで取得する
 export async function renderDistortionMeter(repoName: string, guildId?: string): Promise<void> {
+  // カウントダウン表示
+  await renderCountdown()
+
   const meter = document.getElementById('distortionMeter')
   const meterFill = document.getElementById('meterFill')
   const meterLabel = document.getElementById('meterLabel')
@@ -37,7 +40,7 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
     meterFill.style.width = `${distortionPercent}%`
 
     // ラベルとパーセンテージを更新
-    meterLabel.innerText = `崩壊度メーター`
+    meterLabel.innerText = `チームの崩壊度`
     meterPercent.innerText = `${distortionPercent.toFixed(1)}%`
 
     // 背景色を崩壊度に応じて変更（緑→黄→赤）
@@ -89,6 +92,60 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
     meterPercent.innerText = '-'
     statsContainer.innerHTML = '<p style="color: red;">データの計算に失敗しました。</p>'
   }
+}
+
+// 締め切りカウントダウンを表示
+async function renderCountdown(): Promise<void> {
+  const countdownEl = document.getElementById('countdown')
+  if (!countdownEl) return
+
+  let deadline = await window.api.loadDeadline()
+
+  if (!deadline) {
+    // 初回は日付入力を表示
+    countdownEl.innerHTML = `
+      <div style="margin-bottom: 16px; padding: 12px; background: #1e293b; border-radius: 8px;">
+        <p style="margin: 0 0 8px 0;">📅 締め切り日を設定してください</p>
+        <input type="date" id="deadlineInput" style="padding: 6px; border-radius: 4px; border: none;" />
+        <button id="deadlineSaveBtn" style="margin-left: 8px; padding: 6px 12px; border-radius: 4px; border: none; background: #3b82f6; color: white; cursor: pointer;">
+          設定
+        </button>
+      </div>
+    `
+
+    document.getElementById('deadlineSaveBtn')?.addEventListener('click', async () => {
+      const input = document.getElementById('deadlineInput') as HTMLInputElement
+      if (!input.value) return
+      await window.api.saveDeadline(input.value)
+      await renderCountdown()
+    })
+    return
+  }
+
+  // カウントダウン計算
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const deadlineDate = new Date(deadline)
+  deadlineDate.setHours(0, 0, 0, 0)
+  const diffMs = deadlineDate.getTime() - today.getTime()
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+
+  const color = diffDays <= 3 ? '#ef4444' : diffDays <= 7 ? '#eab308' : '#22c55e'
+  const message = diffDays < 0 ? '締め切りを過ぎています！' : diffDays === 0 ? '今日が締め切りです！' : `締め切りまで：${diffDays}日`
+
+  countdownEl.innerHTML = `
+    <div style="margin-bottom: 16px; padding: 12px; background: #1e293b; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+      <span style="font-size: 20px; font-weight: bold; color: ${color};">📅 ${message}</span>
+      <button id="deadlineChangeBtn" style="padding: 4px 10px; border-radius: 4px; border: none; background: #475569; color: white; cursor: pointer; font-size: 12px;">
+        変更
+      </button>
+    </div>
+  `
+
+  document.getElementById('deadlineChangeBtn')?.addEventListener('click', async () => {
+    await window.api.saveDeadline('')
+    await renderCountdown()
+  })
 }
 
 export function setupPage5(): void {

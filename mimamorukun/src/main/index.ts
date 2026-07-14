@@ -128,6 +128,28 @@ app.whenReady().then(async () => {
     await fetchAndSaveData(token, selectedRepos)
     return getOutputPath()
   })
+
+  // ─── 締め切り日管理系 ──────────────────────────────
+
+// 締め切り日を保存
+ipcMain.handle('deadline:save', async (_, dateStr: string) => {
+  const path = await import('path')
+  const fs = await import('fs')
+  const deadlinePath = path.join(app.getAppPath(), 'deadline.json')
+  fs.writeFileSync(deadlinePath, JSON.stringify({ deadline: dateStr }), 'utf-8')
+})
+
+// 締め切り日を取得
+ipcMain.handle('deadline:load', async () => {
+  const path = await import('path')
+  const fs = await import('fs')
+  const deadlinePath = path.join(app.getAppPath(), 'deadline.json')
+  if (!fs.existsSync(deadlinePath)) return null
+  const data = JSON.parse(fs.readFileSync(deadlinePath, 'utf-8'))
+  return data.deadline
+})
+
+
   // リポジトリのデータから崩壊度を計算
   ipcMain.handle('github:calculateDistortion', async (_, repoName: string, guildId?: string) => {
   const outputPath = getOutputPath()

@@ -80,6 +80,18 @@ const api = {
       }[]
     > => ipcRenderer.invoke('discord:calcScores', guildId),
   },
+
+
+    // ─── 締め切り日管理系 ──────────────────────────────
+  // 締め切り日を保存
+  saveDeadline: (dateStr: string): Promise<void> =>
+    ipcRenderer.invoke('deadline:save', dateStr),
+  // 締め切り日を取得
+  loadDeadline: (): Promise<string | null> =>
+    ipcRenderer.invoke('deadline:load'),
+
+
+  
    // ─── みまもるくん チャット系 ──────────────────────────
 
   // メッセージを送信して返答を取得
