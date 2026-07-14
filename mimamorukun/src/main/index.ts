@@ -210,7 +210,33 @@ ipcMain.handle('deadline:load', async () => {
     }
   }
 
-  return { ...result, totalCommits, totalMessages }
+  // 個人別発言数を取得
+const messagesByUser: Record<string, number> = {}
+if (guildId) {
+  try {
+    const links = await getAccountLinks(repoName)
+    const discordData = await calcDiscordScores(guildId)
+    for (const link of links) {
+      if (link.discord_user_id && link.discord_user_id !== 'BOT_EXCLUDED') {
+        const discordUser = discordData.find((d) => d.author_id === link.discord_user_id)
+        if (discordUser) {
+          messagesByUser[link.github_username] = discordUser.breakdown.messageCount
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('個人別発言数の取得に失敗しました:', e)
+  }
+}
+
+return {
+  ...result,
+  totalCommits,
+  totalMessages,
+  commitsByUser: repoData.commits.byUser,
+  messagesByUser
+}
+
 })
   // ─── Discord OAuth認証系 ───────────────────────────
   // 保存済みDiscordトークン確認（ユーザー情報のみ返す。トークン自体はrendererに渡さない）

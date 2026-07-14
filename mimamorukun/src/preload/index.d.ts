@@ -25,6 +25,8 @@ declare global {
         distortion: number
         totalCommits: number
         totalMessages: number
+        commitsByUser: Record<string, number>
+        messagesByUser: Record<string, number>
       }>
 
 
