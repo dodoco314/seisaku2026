@@ -27,13 +27,16 @@ const api = {
   // 選択したリポジトリのデータを取得してJSONに保存
   fetchData: (selectedRepos: string[]): Promise<string> => ipcRenderer.invoke('github:fetch', selectedRepos),
   // 崩壊度を計算
-  calculateDistortion: (repoName: string): Promise<{
-    scores: Record<string, number>
-    avgScore: number
-    stdDev: number
-    distortion: number
-  }> => ipcRenderer.invoke('github:calculateDistortion', repoName),
-
+  calculateDistortion: (repoName: string, guildId?: string): Promise<{
+  scores: Record<string, number>
+  avgScore: number
+  stdDev: number
+  distortion: number
+  totalCommits: number
+  totalMessages: number
+  commitsByUser: Record<string, number>
+  messagesByUser: Record<string, number>
+}> => ipcRenderer.invoke('github:calculateDistortion', repoName, guildId),
   // ─── Discord系 ────────────────────────────────────
   discord: {
     // 認証系（トークン自体はmainプロセスのみ保持、rendererには絶対渡さない）
@@ -81,6 +84,18 @@ const api = {
       }[]
     > => ipcRenderer.invoke('discord:calcScores', guildId),
   },
+
+
+    // ─── 締め切り日管理系 ──────────────────────────────
+  // 締め切り日を保存
+  saveDeadline: (dateStr: string): Promise<void> =>
+    ipcRenderer.invoke('deadline:save', dateStr),
+  // 締め切り日を取得
+  loadDeadline: (): Promise<string | null> =>
+    ipcRenderer.invoke('deadline:load'),
+
+
+  
    // ─── みまもるくん チャット系 ──────────────────────────
 
   // メッセージを送信して返答を取得

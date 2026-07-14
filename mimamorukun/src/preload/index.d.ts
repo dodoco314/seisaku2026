@@ -18,14 +18,23 @@ declare global {
 
       // データ取得系
       fetchData: (selectedRepos: string[]) => Promise<string>
-      calculateDistortion: (repoName: string) => Promise<{
+      calculateDistortion: (repoName: string, guildId?: string) => Promise<{
         scores: Record<string, number>
         avgScore: number
         stdDev: number
         distortion: number
-
+        totalCommits: number
+        totalMessages: number
+        commitsByUser: Record<string, number>
+        messagesByUser: Record<string, number>
       }>
 
+
+       // 締め切り日管理系
+      saveDeadline: (dateStr: string) => Promise<void>
+      loadDeadline: () => Promise<string | null>
+
+      
       // みまもるくん チャット系
       chat: (message: string, userId?: string) => Promise<string>
 

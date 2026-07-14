@@ -6,3 +6,4 @@ out
 *.log*
 .env
 github-data.json
+deadline.json

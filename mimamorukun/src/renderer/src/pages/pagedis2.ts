@@ -40,16 +40,19 @@ export async function renderLinkingPage(guildId: string, repoFullName: string): 
         : '<span class="status-warn">未紐付け</span>'
 
       // Discordユーザー選択プルダウン
+      const isBotExcluded = link.discord_user_id === 'BOT_EXCLUDED'
       const options = discordUsers.map((u) => {
-        const selected = u.author_id === link.discord_user_id ? 'selected' : ''
+      const selected = u.author_id === link.discord_user_id ? 'selected' : ''
         return `<option value="${u.author_id}" data-name="${u.author_name}" ${selected}>${u.author_name}（${u.message_count}件）</option>`
       })
+      const botOption = `<option value="BOT_EXCLUDED" data-name="BOT" ${isBotExcluded ? 'selected' : ''}>🤖 Botとして除外</option>`
 
       div.innerHTML = `
         <span class="github-label">Git: ${link.github_username}</span>
         <span>${linkedStatus}</span>
         <select class="discordSelect" data-github="${link.github_username}">
           <option value="">Discordアカウントを選択...</option>
+          ${botOption}
           ${options.join('')}
         </select>
       `
@@ -102,7 +105,7 @@ export function setupPageDis2(): void {
     }
 
     // 紐付け保存後に崩壊度メーター画面へ
-    await renderDistortionMeter(selectedRepoName)
+    await renderDistortionMeter(selectedRepoName, selectedGuildId)
     showPage('pageresult')
   })
 

@@ -128,15 +128,116 @@ app.whenReady().then(async () => {
     await fetchAndSaveData(token, selectedRepos)
     return getOutputPath()
   })
-  // リポジトリのデータから崩壊度を計算
-  ipcMain.handle('github:calculateDistortion', async (_, repoName: string) => {
-    const outputPath = getOutputPath()
-    const data = JSON.parse(readFileSync(outputPath, 'utf-8'))
-    if (!data[repoName]) throw new Error(`データが見つかりません: ${repoName}`)
-    const repoData = data[repoName]
-    return calculateDistortion(repoData.commits.byUser, repoData.branches.byUser)
-  })
 
+  // ─── 締め切り日管理系 ──────────────────────────────
+
+// 締め切り日を保存
+ipcMain.handle('deadline:save', async (_, dateStr: string) => {
+  const path = await import('path')
+  const fs = await import('fs')
+  const deadlinePath = path.join(app.getAppPath(), 'deadline.json')
+  fs.writeFileSync(deadlinePath, JSON.stringify({ deadline: dateStr }), 'utf-8')
+})
+
+// 締め切り日を取得
+ipcMain.handle('deadline:load', async () => {
+  const path = await import('path')
+  const fs = await import('fs')
+  const deadlinePath = path.join(app.getAppPath(), 'deadline.json')
+  if (!fs.existsSync(deadlinePath)) return null
+  const data = JSON.parse(fs.readFileSync(deadlinePath, 'utf-8'))
+  return data.deadline
+})
+
+
+  // リポジトリのデータから崩壊度を計算
+  ipcMain.handle('github:calculateDistortion', async (_, repoName: string, guildId?: string) => {
+  const outputPath = getOutputPath()
+  const data = JSON.parse(readFileSync(outputPath, 'utf-8'))
+
+  if (!data[repoName]) {
+    throw new Error(`データが見つかりません: ${repoName}`)
+  }
+
+  const repoData = data[repoName]
+
+  let discordScores: Record<string, number> | undefined = undefined
+  const excludedUsers: string[] = []
+
+  if (guildId) {
+    try {
+      const links = await getAccountLinks(repoName)
+      const discordData = await calcDiscordScores(guildId)
+
+      discordScores = {}
+      for (const link of links) {
+        // BOT_EXCLUDEDが設定されているユーザーは除外リストに追加
+        if (link.discord_user_id === 'BOT_EXCLUDED') {
+          console.log(`[Bot除外] ${link.github_username} をスコア計算から除外します`)
+          excludedUsers.push(link.github_username)
+          continue
+        }
+        if (link.discord_user_id) {
+          const discordUser = discordData.find((d) => d.author_id === link.discord_user_id)
+          if (discordUser) {
+            discordScores[link.github_username] = discordUser.score
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Discordスコア取得失敗、GitHubのみで計算します:', e)
+    }
+  }
+
+  const result = calculateDistortion(
+  repoData.commits.byUser,
+  repoData.branches.byUser,
+  discordScores,
+  excludedUsers
+  )
+
+  // 総コミット数（github-data.jsonから）
+  const totalCommits = repoData.commits.total
+
+  // 総発言数（DiscordのmessageCountの合計）
+  let totalMessages = 0
+  if (guildId) {
+    try {
+      const discordData = await calcDiscordScores(guildId)
+      totalMessages = discordData.reduce((sum, u) => sum + u.breakdown.messageCount, 0)
+    } catch (e) {
+      console.warn('総発言数の取得に失敗しました:', e)
+    }
+  }
+
+  // 個人別発言数を取得
+const messagesByUser: Record<string, number> = {}
+if (guildId) {
+  try {
+    const links = await getAccountLinks(repoName)
+    const discordData = await calcDiscordScores(guildId)
+    for (const link of links) {
+      if (link.discord_user_id && link.discord_user_id !== 'BOT_EXCLUDED') {
+        const discordUser = discordData.find((d) => d.author_id === link.discord_user_id)
+        if (discordUser) {
+          messagesByUser[link.github_username] = discordUser.breakdown.messageCount
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('個人別発言数の取得に失敗しました:', e)
+  }
+}
+
+return {
+  ...result,
+  totalCommits,
+  totalMessages,
+  commitsByUser: repoData.commits.byUser,
+  messagesByUser
+}
+
+})
   // ─── Discord OAuth認証系 ───────────────────────────
   // 保存済みDiscordトークン確認（ユーザー情報のみ返す。トークン自体はrendererに渡さない）
   ipcMain.handle('discord:getUser', async () => await getSavedDiscordUser())
