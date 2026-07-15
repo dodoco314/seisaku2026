@@ -164,30 +164,46 @@ ipcMain.handle('deadline:load', async () => {
   let discordScores: Record<string, number> | undefined = undefined
   const excludedUsers: string[] = []
 
-  if (guildId) {
-    try {
-      const links = await getAccountLinks(repoName)
-      const discordData = await calcDiscordScores(guildId)
+if (guildId) {
+  try {
+    const links = await getAccountLinks(repoName)
+    const discordData = await calcDiscordScores(guildId)
 
-      discordScores = {}
-      for (const link of links) {
-        // BOT_EXCLUDEDが設定されているユーザーは除外リストに追加
-        if (link.discord_user_id === 'BOT_EXCLUDED') {
-          console.log(`[Bot除外] ${link.github_username} をスコア計算から除外します`)
-          excludedUsers.push(link.github_username)
-          continue
-        }
-        if (link.discord_user_id) {
-          const discordUser = discordData.find((d) => d.author_id === link.discord_user_id)
-          if (discordUser) {
-            discordScores[link.github_username] = discordUser.score
-          }
+    discordScores = {}
+
+    // 紐付け済みユーザーの処理
+    for (const link of links) {
+      if (link.discord_user_id === 'BOT_EXCLUDED') {
+        console.log(`[Bot除外] ${link.github_username} をスコア計算から除外します`)
+        excludedUsers.push(link.github_username)
+        continue
+      }
+      if (link.discord_user_id) {
+        const discordUser = discordData.find((d) => d.author_id === link.discord_user_id)
+        if (discordUser) {
+          discordScores[link.github_username] = discordUser.score
         }
       }
-    } catch (e) {
-      console.warn('Discordスコア取得失敗、GitHubのみで計算します:', e)
     }
+
+    // Discordのみのユーザーを追加（GitHubと紐付けされていないユーザー）
+    const linkedDiscordIds = new Set(
+      links
+        .filter((l) => l.discord_user_id && l.discord_user_id !== 'BOT_EXCLUDED')
+        .map((l) => l.discord_user_id)
+    )
+
+    for (const discordUser of discordData) {
+      if (!linkedDiscordIds.has(discordUser.author_id)) {
+        // 紐付けされていないDiscordユーザーをDiscord名でそのまま追加
+        discordScores[discordUser.author_name] = discordUser.score
+      }
+    }
+
+  } catch (e) {
+    console.warn('Discordスコア取得失敗、GitHubのみで計算します:', e)
   }
+}
 
   const result = calculateDistortion(
   repoData.commits.byUser,
@@ -216,12 +232,26 @@ if (guildId) {
   try {
     const links = await getAccountLinks(repoName)
     const discordData = await calcDiscordScores(guildId)
+
+    // 紐付け済みユーザーの発言数
+    const linkedDiscordIds = new Set(
+      links
+        .filter((l) => l.discord_user_id && l.discord_user_id !== 'BOT_EXCLUDED')
+        .map((l) => l.discord_user_id)
+    )
     for (const link of links) {
       if (link.discord_user_id && link.discord_user_id !== 'BOT_EXCLUDED') {
         const discordUser = discordData.find((d) => d.author_id === link.discord_user_id)
         if (discordUser) {
           messagesByUser[link.github_username] = discordUser.breakdown.messageCount
         }
+      }
+    }
+
+    // 未紐付けDiscordユーザーの発言数
+    for (const discordUser of discordData) {
+      if (!linkedDiscordIds.has(discordUser.author_id)) {
+        messagesByUser[discordUser.author_name] = discordUser.breakdown.messageCount
       }
     }
   } catch (e) {
