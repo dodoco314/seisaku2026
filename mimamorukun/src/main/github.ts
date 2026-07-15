@@ -2,7 +2,7 @@ import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
 
-const OUTPUT_PATH = join(app.getAppPath(), 'github-data.json')
+const OUTPUT_PATH = join(app.getPath('userData'), 'github-data.json')
 
 // リポジトリ一覧を取得
 export async function getRepositories(token: string): Promise<{ name: string; full_name: string }[]> {

@@ -6,3 +6,13 @@ export function showPage(pageId: string): void {
   const target = document.getElementById(pageId)
   if (target) target.style.display = 'block'
 }
+
+// XSS対策: 文字列をエスケープする
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
