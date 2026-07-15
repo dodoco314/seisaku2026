@@ -11,6 +11,8 @@ export interface DistortionData {
 let currentDistortionData: DistortionData | null = null
 let currentRepoName: string | null = null
 
+const CHART_COL_WIDTH = 500
+
 export async function renderDistortionMeter(repoName: string, guildId?: string): Promise<void> {
   await renderCountdown()
 
@@ -30,6 +32,16 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
     currentRepoName = repoName
 
     const distortionPercent = Math.min(data.distortion, 100)
+
+    const track = meterFill.parentElement as HTMLElement | null
+    if (track) {
+      track.style.background = '#1c1c25'
+      track.style.borderRadius = '999px'
+      track.style.overflow = 'hidden'
+      track.style.border = '0.5px solid #2a2a35'
+    }
+    meterFill.style.borderRadius = '999px'
+    meterFill.style.transition = 'width 0.4s ease, background-color 0.4s ease'
     meterFill.style.width = `${distortionPercent}%`
     meterLabel.innerText = `チームの崩壊度`
     meterPercent.innerText = `${distortionPercent.toFixed(1)}%`
@@ -51,15 +63,22 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
     const initialHTML = buildPieChart(sortedEntries, totalScore, medals, colors, data)
 
     statsContainer.innerHTML = `
-      <div style="margin: 16px 0;">
-        <h3 style="color: inherit;">統計情報</h3>
-        <p style="color: inherit;"><strong>総コミット数:</strong> ${data.totalCommits}件</p>
-        <p style="color: inherit;"><strong>総発言数:</strong> ${data.totalMessages}件</p>
-        <h3 style="color: inherit;">メンバーのスコア</h3>
-        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-          <button id="tabContribution" style="padding: 6px 16px; border-radius: 4px; border: none; background: #3b82f6; color: white; cursor: pointer;">貢献度</button>
-          <button id="tabCommits" style="padding: 6px 16px; border-radius: 4px; border: none; background: #475569; color: white; cursor: pointer;">コミット数</button>
-          <button id="tabMessages" style="padding: 6px 16px; border-radius: 4px; border: none; background: #475569; color: white; cursor: pointer;">発言数</button>
+      <div style="margin: 12px 0;">
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <div style="flex: 1; padding: 8px 12px; background: #15151c; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; color: #8a8a99;">総コミット数</span>
+            <span style="font-size: 14px; font-weight: 700; color: inherit;">${data.totalCommits}件</span>
+          </div>
+          <div style="flex: 1; padding: 8px 12px; background: #15151c; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; color: #8a8a99;">総発言数</span>
+            <span style="font-size: 14px; font-weight: 700; color: inherit;">${data.totalMessages}件</span>
+          </div>
+        </div>
+        <h3 style="color: inherit; font-size: 15px; margin: 8px 0;">メンバーのスコア</h3>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <button id="tabContribution" style="padding: 4px 14px; border-radius: 4px; border: none; background: #3b82f6; color: white; cursor: pointer; font-size: 12px;">貢献度</button>
+          <button id="tabCommits" style="padding: 4px 14px; border-radius: 4px; border: none; background: #475569; color: white; cursor: pointer; font-size: 12px;">コミット数</button>
+          <button id="tabMessages" style="padding: 4px 14px; border-radius: 4px; border: none; background: #475569; color: white; cursor: pointer; font-size: 12px;">発言数</button>
         </div>
         <div id="scoreList">${initialHTML}</div>
       </div>
@@ -105,13 +124,12 @@ function buildPieChart(
   colors: string[],
   data: any
 ): string {
-  const size = 200
+  const size = 150
   const cx = size / 2
   const cy = size / 2
-  const r = 80
+  const r = 60
   let startAngle = -Math.PI / 2
   let slices = ''
-  let legends = ''
 
   entries.forEach(([user, score], index) => {
     const contribution = totalScore > 0 ? score / totalScore : 0
@@ -123,19 +141,13 @@ function buildPieChart(
     const y2 = cy + r * Math.sin(endAngle)
     const largeArc = angle > Math.PI ? 1 : 0
     const color = colors[index % colors.length]
-    const medal = medals[index] ?? ''
 
     slices += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z" fill="${color}" stroke="white" stroke-width="2"/>`
 
     const midAngle = startAngle + angle / 2
     const lx = cx + (r * 0.65) * Math.cos(midAngle)
     const ly = cy + (r * 0.65) * Math.sin(midAngle)
-    slices += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="11" font-weight="bold">${(contribution * 100).toFixed(1)}%</text>`
-
-    legends += `<li style="display:flex;align-items:center;gap:6px;margin:4px 0;color:#fff;">
-      <span style="display:inline-block;width:12px;height:12px;background:${color};border-radius:2px;flex-shrink:0;"></span>
-      ${medal} ${escapeHtml(user)}
-    </li>`
+    slices += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="9" font-weight="bold">${(contribution * 100).toFixed(1)}%</text>`
 
     startAngle = endAngle
   })
@@ -143,28 +155,29 @@ function buildPieChart(
   const tableRows = entries.map(([user, score], index) => {
     const contribution = totalScore > 0 ? (score / totalScore) * 100 : 0
     const medal = medals[index] ?? `${index + 1}位`
-    return `<tr style="border-bottom:1px solid #334155;">
-      <td style="padding:8px;">${medal}</td>
-      <td style="padding:8px;">${escapeHtml(user)}</td>
-      <td style="padding:8px;text-align:right;">${contribution.toFixed(1)}%</td>
+    return `<tr style="border-bottom:1px solid #2a2a35;">
+      <td style="padding:5px 8px;">${medal}</td>
+      <td style="padding:5px 8px;">${escapeHtml(user)}</td>
+      <td style="padding:5px 8px;text-align:right;">${contribution.toFixed(1)}%</td>
     </tr>`
   }).join('')
 
   return `
-    <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
-      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${slices}</svg>
-      <ul style="list-style:none;padding:0;margin:0;">${legends}</ul>
+    <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+      <div style="width:${CHART_COL_WIDTH}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${slices}</svg>
+      </div>
+      <table style="width:300px;flex-shrink:0;border-collapse:collapse;color:#E5E4F0;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:1px solid #3a3a48;">
+            <th style="padding:5px 8px;text-align:left;color:#8a8a99;font-weight:400;">順位</th>
+            <th style="padding:5px 8px;text-align:left;color:#8a8a99;font-weight:400;">名前</th>
+            <th style="padding:5px 8px;text-align:right;color:#8a8a99;font-weight:400;">貢献度</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
     </div>
-    <table style="width:100%;border-collapse:collapse;margin-top:16px;color:#fff;">
-      <thead>
-        <tr style="border-bottom:1px solid #475569;">
-          <th style="padding:8px;text-align:left;">順位</th>
-          <th style="padding:8px;text-align:left;">名前</th>
-          <th style="padding:8px;text-align:right;">貢献度</th>
-        </tr>
-      </thead>
-      <tbody>${tableRows}</tbody>
-    </table>
   `
 }
 
@@ -179,9 +192,10 @@ function buildBarChart(
     type === 'commits' ? (data.commitsByUser[user] ?? 0) : (data.messagesByUser[user] ?? 0)
   )
   const maxVal = Math.max(...values, 1)
-  const barWidth = 50
-  const gap = 20
-  const chartH = 160
+  const barWidth = 56
+  const gap = 22
+  const chartH = 120
+  const topPad = 22
   const chartW = entries.length * (barWidth + gap) + gap
   const unit = type === 'commits' ? '回' : '件'
 
@@ -190,42 +204,50 @@ function buildBarChart(
     const val = values[index]
     const barH = (val / maxVal) * chartH
     const x = gap + index * (barWidth + gap)
-    const y = chartH - barH
+    const y = topPad + (chartH - barH)
     const color = colors[index % colors.length]
     const medal = medals[index] ?? ''
+
+    const label = `${medal}${user}`
+    const maxChars = Math.max(4, Math.floor((barWidth + gap - 6) / 6))
+    const displayLabel = label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label
 
     bars += `
       <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" fill="${color}" rx="4"/>
       <text x="${x + barWidth / 2}" y="${y - 6}" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">${val}</text>
-      <text x="${x + barWidth / 2}" y="${chartH + 16}" text-anchor="middle" fill="#fff" font-size="11">${medal}${escapeHtml(user)}</text>
+      <text x="${x + barWidth / 2}" y="${topPad + chartH + 16}" text-anchor="middle" fill="#fff" font-size="10">${escapeHtml(displayLabel)}</text>
     `
   })
 
   const tableRows = entries.map(([user], index) => {
     const val = values[index]
     const medal = medals[index] ?? `${index + 1}位`
-    return `<tr style="border-bottom:1px solid #334155;">
-      <td style="padding:8px;">${medal}</td>
-      <td style="padding:8px;">${escapeHtml(user)}</td>
-      <td style="padding:8px;text-align:right;">${val}${unit}</td>
+    return `<tr style="border-bottom:1px solid #2a2a35;">
+      <td style="padding:5px 8px;">${medal}</td>
+      <td style="padding:5px 8px;">${escapeHtml(user)}</td>
+      <td style="padding:5px 8px;text-align:right;">${val}${unit}</td>
     </tr>`
   }).join('')
 
   return `
-    <svg width="${chartW}" height="${chartH + 40}" viewBox="0 0 ${chartW} ${chartH + 40}" style="overflow:visible;">
-      <line x1="0" y1="${chartH}" x2="${chartW}" y2="${chartH}" stroke="#666" stroke-width="1"/>
-      ${bars}
-    </svg>
-    <table style="width:100%;border-collapse:collapse;margin-top:16px;color:#fff;">
-      <thead>
-        <tr style="border-bottom:1px solid #475569;">
-          <th style="padding:8px;text-align:left;">順位</th>
-          <th style="padding:8px;text-align:left;">名前</th>
-          <th style="padding:8px;text-align:right;">${type === 'commits' ? 'コミット数' : '発言数'}</th>
-        </tr>
-      </thead>
-      <tbody>${tableRows}</tbody>
-    </table>
+    <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+      <div style="width:${CHART_COL_WIDTH}px;flex-shrink:0;display:flex;align-items:center;">
+        <svg width="${chartW}" height="${topPad + chartH + 32}" viewBox="0 0 ${chartW} ${topPad + chartH + 32}" style="overflow:visible;">
+          <line x1="0" y1="${topPad + chartH}" x2="${chartW}" y2="${topPad + chartH}" stroke="#4a4a58" stroke-width="1"/>
+          ${bars}
+        </svg>
+      </div>
+      <table style="width:300px;flex-shrink:0;border-collapse:collapse;color:#E5E4F0;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:1px solid #3a3a48;">
+            <th style="padding:5px 8px;text-align:left;color:#8a8a99;font-weight:400;">順位</th>
+            <th style="padding:5px 8px;text-align:left;color:#8a8a99;font-weight:400;">名前</th>
+            <th style="padding:5px 8px;text-align:right;color:#8a8a99;font-weight:400;">${type === 'commits' ? 'コミット数' : '発言数'}</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
   `
 }
 
