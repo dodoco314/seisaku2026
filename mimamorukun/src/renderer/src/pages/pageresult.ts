@@ -1,4 +1,4 @@
-import { showPage } from '../utils/dom'
+import { showPage, escapeHtml } from '../utils/dom'
 import { setupChat } from './pagechat'
 
 export interface DistortionData {
@@ -134,7 +134,7 @@ function buildPieChart(
 
     legends += `<li style="display:flex;align-items:center;gap:6px;margin:4px 0;color:#fff;">
       <span style="display:inline-block;width:12px;height:12px;background:${color};border-radius:2px;flex-shrink:0;"></span>
-      ${medal} ${user}
+      ${medal} ${escapeHtml(user)}
     </li>`
 
     startAngle = endAngle
@@ -145,7 +145,7 @@ function buildPieChart(
     const medal = medals[index] ?? `${index + 1}位`
     return `<tr style="border-bottom:1px solid #334155;">
       <td style="padding:8px;">${medal}</td>
-      <td style="padding:8px;">${user}</td>
+      <td style="padding:8px;">${escapeHtml(user)}</td>
       <td style="padding:8px;text-align:right;">${contribution.toFixed(1)}%</td>
     </tr>`
   }).join('')
@@ -197,7 +197,7 @@ function buildBarChart(
     bars += `
       <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" fill="${color}" rx="4"/>
       <text x="${x + barWidth / 2}" y="${y - 6}" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">${val}</text>
-      <text x="${x + barWidth / 2}" y="${chartH + 16}" text-anchor="middle" fill="#fff" font-size="11">${medal}${user}</text>
+      <text x="${x + barWidth / 2}" y="${chartH + 16}" text-anchor="middle" fill="#fff" font-size="11">${medal}${escapeHtml(user)}</text>
     `
   })
 
@@ -206,7 +206,7 @@ function buildBarChart(
     const medal = medals[index] ?? `${index + 1}位`
     return `<tr style="border-bottom:1px solid #334155;">
       <td style="padding:8px;">${medal}</td>
-      <td style="padding:8px;">${user}</td>
+      <td style="padding:8px;">${escapeHtml(user)}</td>
       <td style="padding:8px;text-align:right;">${val}${unit}</td>
     </tr>`
   }).join('')

@@ -14,7 +14,6 @@ const pool = new Pool({
 // ─── Discord OAuth2設定 ───────────────────────────────────────────────────
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID!
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET!
-const REDIRECT_URI = 'http://localhost:31415/callback'
 const KEYTAR_SERVICE = 'mimamorukun-discord'
 const KEYTAR_ACCOUNT = 'discord_token'
 
@@ -31,7 +30,7 @@ export async function initDiscordTables(): Promise<void> {
     )
   `)
 
-  // ─── マイグレーション: 旧スキーマ（guild_id単体UNIQUE・repo_full_name無し）からの移行 ───
+// ─── マイグレーション: 旧スキーマ（guild_id単体UNIQUE・repo_full_name無し）からの移行 ───
   // 既存テーブルに repo_full_name が無ければ追加
   await pool.query(`
     ALTER TABLE discord_settings ADD COLUMN IF NOT EXISTS repo_full_name TEXT NOT NULL DEFAULT ''
@@ -66,16 +65,7 @@ export async function initDiscordTables(): Promise<void> {
   console.log('[discord] テーブル初期化完了')
 }
 
-// ─── OAuth2: ログイン開始（ブラウザを開く） ───────────────────────────────
-export function startDiscordOAuth(): void {
-  const url =
-    `https://discord.com/api/oauth2/authorize` +
-    `?client_id=${DISCORD_CLIENT_ID}` +
-    `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-    `&response_type=code` +
-    `&scope=identify%20guilds`
-  shell.openExternal(url)
-}
+
 
 // ─── Bot招待用URLを開く ────────────────────────────────────────────────────
 // メッセージ収集Botをサーバーに追加してもらうためのリンク。
@@ -97,15 +87,28 @@ export function openBotInviteUrl(): void {
   shell.openExternal(getBotInviteUrl())
 }
 
-// ─── OAuth2: コールバック待機→トークン取得→keytar保存 ───────────────────
-export async function waitForDiscordCallback(): Promise<string> {
+// ─── OAuth2: ログイン開始＋コールバック待機→トークン取得→keytar保存 ───────
+// ランダムポートを使用してCSRF対策のstateパラメータも検証する
+export async function startDiscordOAuth(): Promise<{ id: string; username: string }> {
   return new Promise((resolve, reject) => {
     const server = createServer(async (req, res) => {
       try {
-        const url = new URL(req.url!, 'http://localhost:31415')
-        const code = url.searchParams.get('code')
+        if (!req.url?.startsWith('/callback')) return
 
-        // ブラウザに完了メッセージを返す
+        const url = new URL(req.url!, `http://localhost`)
+        const code = url.searchParams.get('code')
+        const state = url.searchParams.get('state')
+
+        // stateの検証（CSRF対策）
+        const savedState = await keytar.getPassword(KEYTAR_SERVICE, 'oauth_state')
+        if (!state || state !== savedState) {
+          res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' })
+          res.end('<html><body><h2>❌ 不正なリクエストです。</h2></body></html>')
+          server.close()
+          reject(new Error('不正なstateパラメータ'))
+          return
+        }
+
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
         res.end('<html><body style="font-family:sans-serif;text-align:center;padding:40px"><h2>✅ 認証完了！アプリに戻ってください。</h2></body></html>')
         server.close()
@@ -114,6 +117,9 @@ export async function waitForDiscordCallback(): Promise<string> {
           reject(new Error('認証コードが取得できませんでした'))
           return
         }
+
+        const addr = server.address() as { port: number }
+        const redirectUri = `http://localhost:${addr.port}/callback`
 
         // コード → アクセストークンに交換
         const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
@@ -124,7 +130,7 @@ export async function waitForDiscordCallback(): Promise<string> {
             client_secret: DISCORD_CLIENT_SECRET,
             grant_type: 'authorization_code',
             code,
-            redirect_uri: REDIRECT_URI
+            redirect_uri: redirectUri
           })
         })
 
@@ -137,16 +143,42 @@ export async function waitForDiscordCallback(): Promise<string> {
         // keytarに安全に保存（DB・rendererには渡さない）
         await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, JSON.stringify(tokenData))
         console.log('[discord] OAuth2認証成功')
-        resolve(tokenData.access_token)
+
+        // ユーザー情報を取得して返す
+        const userRes = await fetch('https://discord.com/api/users/@me', {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        })
+        const user = await userRes.json()
+        resolve({ id: user.id, username: user.username })
       } catch (e) {
         reject(e)
       }
     })
 
-    server.listen(31415, () => console.log('[discord] コールバック待機中: port 31415'))
+    // ポートをランダムに割り当て（0を指定するとOSが空きポートを自動選択）
+    server.listen(0, async () => {
+      const addr = server.address() as { port: number }
+      const redirectUri = `http://localhost:${addr.port}/callback`
+      console.log(`[discord] コールバック待機中: port ${addr.port}`)
+
+      // stateを生成して保存（CSRF対策）
+      const state = crypto.randomUUID()
+      await keytar.setPassword(KEYTAR_SERVICE, 'oauth_state', state)
+
+      const authUrl =
+        `https://discord.com/api/oauth2/authorize` +
+        `?client_id=${DISCORD_CLIENT_ID}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&response_type=code` +
+        `&scope=identify%20guilds` +
+        `&state=${state}`
+
+      shell.openExternal(authUrl)
+    })
     server.on('error', reject)
   })
 }
+
 
 // ─── 保存済みDiscordトークンを取得 ───────────────────────────────────────
 export async function getSavedDiscordToken(): Promise<string | null> {
