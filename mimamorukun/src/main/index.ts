@@ -21,7 +21,6 @@ import {
 } from './discord'
 import {
   startDiscordOAuth,
-  getSavedDiscordToken,
   getSavedDiscordUser,
   deleteDiscordToken,
   getMyGuilds
