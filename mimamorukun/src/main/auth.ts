@@ -1,5 +1,6 @@
 import { shell } from 'electron'
 import * as keytar from 'keytar'
+import * as http from 'http'
 import * as dotenv from 'dotenv'
 dotenv.config()
 
@@ -7,17 +8,13 @@ const CLIENT_ID = process.env.GITHUB_CLIENT_ID!
 const SCOPE = 'read:org,repo'
 const SERVICE_NAME = 'mimamorukun'
 const ACCOUNT_NAME = 'github_token'
-
-// device_codeを一時保存
-let _deviceCode = ''
-let _interval = 5
+const SERVER_URL = 'https://mimamorukuntokensaver-production.up.railway.app'
 
 // 保存済みトークンを取得
 export async function getSavedToken(): Promise<string | null> {
   const saved = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME)
   if (!saved) return null
-  const tokenData = JSON.parse(saved)
-  return tokenData.access_token
+  return JSON.parse(saved).sessionToken
 }
 
 // トークンを削除（ログアウト用）
@@ -39,11 +36,9 @@ export async function startOAuthFlow(): Promise<{ userCode: string; verification
   const data = await res.json()
   console.log('デバイスフロー開始:', data)
 
-  // device_codeとintervalを保存
   _deviceCode = data.device_code
   _interval = data.interval || 5
 
-  // ブラウザでGitHubの入力ページを開く
   shell.openExternal(data.verification_uri)
 
   return {
@@ -51,6 +46,10 @@ export async function startOAuthFlow(): Promise<{ userCode: string; verification
     verificationUri: data.verification_uri
   }
 }
+
+// device_codeを一時保存
+let _deviceCode = ''
+let _interval = 5
 
 // ユーザーが認証するまでポーリング
 export async function pollForToken(): Promise<string> {
@@ -71,7 +70,6 @@ export async function pollForToken(): Promise<string> {
     })
 
     const data = await res.json()
-    console.log('ポーリング結果:', data)
 
     if (data.access_token) {
       // ユーザー情報を取得
@@ -80,20 +78,28 @@ export async function pollForToken(): Promise<string> {
       })
       const user = await userRes.json()
 
-      // Credential Managerに保存
+      // Railwayサーバーにアクセストークンを送ってJWTを取得
+      const serverRes = await fetch(`${SERVER_URL}/auth/github/device`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: data.access_token })
+      })
+      const serverData = await serverRes.json()
+
+      // keytarに保存
       await keytar.setPassword(
         SERVICE_NAME,
         ACCOUNT_NAME,
         JSON.stringify({
-          access_token: data.access_token,
-          scope: data.scope,
+          sessionToken: serverData.sessionToken,
+          accessToken: data.access_token,
           user: user.login,
           saved_at: new Date().toISOString()
         })
       )
 
       console.log('認証成功:', user.login)
-      return data.access_token
+      return serverData.sessionToken
     }
 
     if (data.error && data.error !== 'authorization_pending') {
