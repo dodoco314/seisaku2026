@@ -8,8 +8,8 @@ export interface DistortionData {
   distortion: number
 }
 
-let currentDistortionData: DistortionData | null = null
-let currentRepoName: string | null = null
+// let currentDistortionData: DistortionData | null = null
+// let currentRepoName: string | null = null
 
 const CHART_COL_WIDTH = 500
 
@@ -28,20 +28,12 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
 
   try {
     const data = await window.api.calculateDistortion(repoName, guildId)
-    currentDistortionData = data
-    currentRepoName = repoName
+    // currentDistortionData = data
+    // currentRepoName = repoName
 
     const distortionPercent = Math.min(data.distortion, 100)
 
     const track = meterFill.parentElement as HTMLElement | null
-    if (track) {
-      track.style.background = '#1c1c25'
-      track.style.borderRadius = '999px'
-      track.style.overflow = 'hidden'
-      track.style.border = '0.5px solid #2a2a35'
-    }
-    meterFill.style.borderRadius = '999px'
-    meterFill.style.transition = 'width 0.4s ease, background-color 0.4s ease'
     meterFill.style.width = `${distortionPercent}%`
     meterLabel.innerText = `スコア`
     meterLabel.style.fontSize = '12px'
@@ -52,7 +44,6 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
     if (track) {
       // 33% / 66% の閾値目盛りを描画（再描画のたびに重複しないよう一度クリアする）
       track.querySelectorAll('.meter-tick').forEach((el) => el.remove())
-      track.style.position = 'relative'
       ;[33, 66].forEach((pos) => {
         const tick = document.createElement('div')
         tick.className = 'meter-tick'
@@ -151,7 +142,7 @@ function buildPieChart(
   let startAngle = -Math.PI / 2
   let slices = ''
 
-  entries.forEach(([user, score], index) => {
+  entries.forEach(([, score], index) => {
     const contribution = totalScore > 0 ? score / totalScore : 0
     const angle = contribution * 2 * Math.PI
     const endAngle = startAngle + angle
