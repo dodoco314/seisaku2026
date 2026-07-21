@@ -6,16 +6,18 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 
 // ─── DB接続（mainプロセスのみ。rendererには絶対に漏らさない） ────────────
+// DATABASE_URLは.envから取得（本番はRailwayの環境変数に設定）
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 })
 
 // ─── Discord OAuth2設定 ───────────────────────────────────────────────────
+// DISCORD_CLIENT_SECRETはRailwayサーバー側に移行したため不要
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID!
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET!
 const KEYTAR_SERVICE = 'mimamorukun-discord'
 const KEYTAR_ACCOUNT = 'discord_token'
+const SERVER_URL = 'https://mimamorukuntokensaver-production-df1e.up.railway.app'
 
 // ─── テーブル初期化 ───────────────────────────────────────────────────────
 export async function initDiscordTables(): Promise<void> {
@@ -30,7 +32,7 @@ export async function initDiscordTables(): Promise<void> {
     )
   `)
 
-// ─── マイグレーション: 旧スキーマ（guild_id単体UNIQUE・repo_full_name無し）からの移行 ───
+  // ─── マイグレーション: 旧スキーマ（guild_id単体UNIQUE・repo_full_name無し）からの移行 ───
   // 既存テーブルに repo_full_name が無ければ追加
   await pool.query(`
     ALTER TABLE discord_settings ADD COLUMN IF NOT EXISTS repo_full_name TEXT NOT NULL DEFAULT ''
@@ -65,8 +67,6 @@ export async function initDiscordTables(): Promise<void> {
   console.log('[discord] テーブル初期化完了')
 }
 
-
-
 // ─── Bot招待用URLを開く ────────────────────────────────────────────────────
 // メッセージ収集Botをサーバーに追加してもらうためのリンク。
 // BotはDiscord Developer Portal上でDISCORD_CLIENT_IDと同じアプリケーションに
@@ -87,8 +87,10 @@ export function openBotInviteUrl(): void {
   shell.openExternal(getBotInviteUrl())
 }
 
-// ─── OAuth2: ログイン開始＋コールバック待機→トークン取得→keytar保存 ───────
-// ランダムポートを使用してCSRF対策のstateパラメータも検証する
+// ─── OAuth2: ログイン開始＋コールバック待機→Railwayサーバー経由でトークン取得 ───
+// ・ランダムポートを使用（ポート固定による競合・横取りリスクを回避）
+// ・stateパラメータでCSRF対策
+// ・DISCORD_CLIENT_SECRETはRailwayサーバー側のみに持たせる（Electronには持たせない）
 export async function startDiscordOAuth(): Promise<{ id: string; username: string }> {
   return new Promise((resolve, reject) => {
     const server = createServer(async (req, res) => {
@@ -109,6 +111,10 @@ export async function startDiscordOAuth(): Promise<{ id: string; username: strin
           return
         }
 
+        // 認証完了をブラウザに表示してサーバーを閉じる
+        const addr = server.address() as { port: number }
+        const redirectUri = `http://localhost:${addr.port}/callback`
+
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
         res.end('<html><body style="font-family:sans-serif;text-align:center;padding:40px"><h2>✅ 認証完了！アプリに戻ってください。</h2></body></html>')
         server.close()
@@ -118,45 +124,42 @@ export async function startDiscordOAuth(): Promise<{ id: string; username: strin
           return
         }
 
-        const addr = server.address() as { port: number }
-        const redirectUri = `http://localhost:${addr.port}/callback`
+        
+        // GitHubのセッショントークンを取得（Discord紐付けに使用）
+        const githubToken = await keytar.getPassword('mimamorukun', 'github_token')
+        const sessionToken = githubToken ? JSON.parse(githubToken).sessionToken : null
 
-        // コード → アクセストークンに交換
-        const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
+        // Railwayサーバー経由でDiscord認証
+        // codeとredirectUriをサーバーに送り、サーバー側でDISCORD_CLIENT_SECRETを使ってトークン交換
+        const serverRes = await fetch(`${SERVER_URL}/auth/discord`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: DISCORD_CLIENT_ID,
-            client_secret: DISCORD_CLIENT_SECRET,
-            grant_type: 'authorization_code',
-            code,
-            redirect_uri: redirectUri
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, redirectUri, sessionToken })
         })
 
-        const tokenData = await tokenRes.json()
-        if (!tokenData.access_token) {
-          reject(new Error('トークン取得失敗: ' + JSON.stringify(tokenData)))
+        const serverData = await serverRes.json()
+        console.log('[discord] serverData:', JSON.stringify(serverData))
+        if (serverData.error) {
+          reject(new Error(serverData.error))
           return
         }
 
         // keytarに安全に保存（DB・rendererには渡さない）
-        await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, JSON.stringify(tokenData))
-        console.log('[discord] OAuth2認証成功')
+        await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, JSON.stringify({
+          discordAccessToken: serverData.discordAccessToken,
+          user: serverData.user,
+          saved_at: new Date().toISOString()
+        }))
 
-        // ユーザー情報を取得して返す
-        const userRes = await fetch('https://discord.com/api/users/@me', {
-          headers: { Authorization: `Bearer ${tokenData.access_token}` }
-        })
-        const user = await userRes.json()
-        resolve({ id: user.id, username: user.username })
+        console.log('[discord] OAuth2認証成功')
+        resolve({ id: serverData.user.id, username: serverData.user.username })
       } catch (e) {
         reject(e)
       }
     })
 
-    // ポートをランダムに割り当て（0を指定するとOSが空きポートを自動選択）
-    server.listen(0, async () => {
+    // ポート31415で待機（Discord OAuth Appの設定と合わせる）
+    server.listen(31415, async () => {
       const addr = server.address() as { port: number }
       const redirectUri = `http://localhost:${addr.port}/callback`
       console.log(`[discord] コールバック待機中: port ${addr.port}`)
@@ -179,12 +182,11 @@ export async function startDiscordOAuth(): Promise<{ id: string; username: strin
   })
 }
 
-
 // ─── 保存済みDiscordトークンを取得 ───────────────────────────────────────
 export async function getSavedDiscordToken(): Promise<string | null> {
   const saved = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT)
   if (!saved) return null
-  return JSON.parse(saved).access_token
+  return JSON.parse(saved).discordAccessToken ?? null
 }
 
 // ─── Discordトークンを削除（ログアウト用） ────────────────────────────────
@@ -192,12 +194,20 @@ export async function deleteDiscordToken(): Promise<void> {
   await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT)
 }
 
+// ─── 保存済みDiscordユーザー情報を取得 ───────────────────────────────────
+export async function getSavedDiscordUser(): Promise<{ id: string; username: string } | null> {
+  const saved = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT)
+  if (!saved) return null
+  const data = JSON.parse(saved)
+  return data.user ?? null
+}
+
 // ─── ユーザーが参加しているGuild一覧を取得 ───────────────────────────────
-export async function getUserGuilds(
-  accessToken: string
-): Promise<{ id: string; name: string }[]> {
+export async function getMyGuilds(): Promise<{ id: string; name: string }[]> {
+  const token = await getSavedDiscordToken()
+  if (!token) throw new Error('Discordトークンがありません')
   const res = await fetch('https://discord.com/api/users/@me/guilds', {
-    headers: { Authorization: `Bearer ${accessToken}` }
+    headers: { Authorization: `Bearer ${token}` }
   })
   if (!res.ok) throw new Error('Discordトークンが無効または期限切れです')
   return await res.json()

@@ -3,7 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { readFileSync } from 'fs'
 import icon from '../../resources/icon.png?asset'
-import { startOAuthFlow, getSavedToken, deleteToken, pollForToken } from './auth'
+import { startOAuthFlow, getSavedToken, deleteToken, pollForToken, getGithubAccessToken } from './auth'
 import { getRepositories, fetchAndSaveData, getOutputPath, calculateDistortion } from './github'
 import { loadRepos, addRepo, removeRepo } from './repos'
 import {
@@ -24,7 +24,7 @@ import {
   getSavedDiscordUser,
   deleteDiscordToken,
   getMyGuilds
-} from './discordAuth'
+} from './discord'
 
 // ─── みまもるくん チャット系 ──────────────────────────
 
@@ -107,11 +107,11 @@ app.whenReady().then(async () => {
 
   // ─── リポジトリ管理系 ──────────────────────────────
   // GitHubからリポジトリ一覧を取得
-  ipcMain.handle('repos:getAll', async () => {
-    const token = await getSavedToken()
-    if (!token) throw new Error('未認証です')
-    return await getRepositories(token)
-  })
+ ipcMain.handle('repos:getAll', async () => {
+  const token = await getGithubAccessToken()
+  if (!token) throw new Error('未認証です')
+  return await getRepositories(token)
+})
   // 登録済みリポジトリを取得
   ipcMain.handle('repos:load', () => loadRepos())
   // リポジトリを追加
@@ -122,11 +122,11 @@ app.whenReady().then(async () => {
   // ─── データ取得系 ──────────────────────────────────
   // 選択したリポジトリのデータを取得してJSONに保存
   ipcMain.handle('github:fetch', async (_, selectedRepos: string[]) => {
-    const token = await getSavedToken()
-    if (!token) throw new Error('未認証です')
-    await fetchAndSaveData(token, selectedRepos)
-    return getOutputPath()
-  })
+  const token = await getGithubAccessToken()
+  if (!token) throw new Error('未認証です')
+  await fetchAndSaveData(token, selectedRepos)
+  return getOutputPath()
+})
 
   // ─── 締め切り日管理系 ──────────────────────────────
 
