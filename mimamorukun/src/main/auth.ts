@@ -1,13 +1,15 @@
 import { shell } from 'electron'
 import * as keytar from 'keytar'
-import * as dotenv from 'dotenv'
-dotenv.config()
 
-const CLIENT_ID = process.env.GITHUB_CLIENT_ID!
 const SCOPE = 'read:org,repo'
 const SERVICE_NAME = 'mimamorukun'
 const ACCOUNT_NAME = 'github_token'
 const SERVER_URL = 'https://mimamorukuntokensaver-production-df1e.up.railway.app'
+
+// dotenv.config()より後に実行されるよう関数で取得
+function getClientId(): string {
+  return process.env.GITHUB_CLIENT_ID!
+}
 
 // 保存済みトークンを取得
 export async function getSavedToken(): Promise<string | null> {
@@ -29,7 +31,7 @@ export async function startOAuthFlow(): Promise<{ userCode: string; verification
       'Content-Type': 'application/json',
       Accept: 'application/json'
     },
-    body: JSON.stringify({ client_id: CLIENT_ID, scope: SCOPE })
+    body: JSON.stringify({ client_id: getClientId(), scope: SCOPE })
   })
 
   const data = await res.json()
@@ -62,7 +64,7 @@ export async function pollForToken(): Promise<string> {
         Accept: 'application/json'
       },
       body: JSON.stringify({
-        client_id: CLIENT_ID,
+        client_id: getClientId(),
         device_code: _deviceCode,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
       })
@@ -85,7 +87,7 @@ export async function pollForToken(): Promise<string> {
       })
       const serverData = await serverRes.json()
       console.log('Railwayサーバーレスポンス:', JSON.stringify(serverData))
-      
+
       // keytarに保存
       await keytar.setPassword(
         SERVICE_NAME,
@@ -107,7 +109,6 @@ export async function pollForToken(): Promise<string> {
     }
   }
 }
-
 
 // GitHub APIアクセス用のトークンを取得
 export async function getGithubAccessToken(): Promise<string | null> {

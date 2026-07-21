@@ -1,5 +1,21 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import * as dotenv from 'dotenv'
+
+// ビルド後はresources/.envを読み込む、開発時は.envを読み込む
+
+  const envPath = app.isPackaged
+  ? join(process.resourcesPath, '.env')
+  : join(__dirname, '../../.env')
+
+    console.log('[env] isPackaged:', app.isPackaged)
+    console.log('[env] envPath:', envPath)
+    console.log('[env] GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID)
+
+    dotenv.config({ path: envPath })
+
+    console.log('[env] after dotenv GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID)
+
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { readFileSync } from 'fs'
 import icon from '../../resources/icon.png?asset'
