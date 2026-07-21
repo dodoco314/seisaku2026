@@ -6,6 +6,7 @@ import icon from '../../resources/icon.png?asset'
 import { startOAuthFlow, getSavedToken, deleteToken, pollForToken, getGithubAccessToken } from './auth'
 import { getRepositories, fetchAndSaveData, getOutputPath, calculateDistortion } from './github'
 import { loadRepos, addRepo, removeRepo } from './repos'
+import { setupOllama } from './ollama'
 import {
   initDiscordTables,
   getAvailableServers,
@@ -93,6 +94,18 @@ app.whenReady().then(async () => {
     await initDiscordTables()
   } catch (e) {
     console.error('[discord] テーブル初期化失敗:', e)
+  }
+
+  // Ollamaの自動セットアップ
+  try {
+    const ollamaResult = await setupOllama()
+    console.log('[ollama]', ollamaResult.message)
+    if (ollamaResult.status === 'not_installed') {
+      // Ollamaが未インストールの場合はインストールページを開く
+      shell.openExternal('https://ollama.com/download')
+    }
+  } catch (e) {
+    console.error('[ollama] セットアップ失敗:', e)
   }
 
   // ─── GitHub認証系 ──────────────────────────────────
