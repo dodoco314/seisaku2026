@@ -9,7 +9,10 @@ export function setupPage1(): void {
   const copyBtn = document.getElementById('copyBtn')
 
   loginBtn?.addEventListener('click', async () => {
-    if (statusText) statusText.innerText = '認証中...'
+    if (statusText) {
+      statusText.className = 'status-loading'
+      statusText.innerHTML = '<span class="spinner"></span>認証中...'
+    }
 
     const { userCode } = await window.api.login()
     if (userCodeText) {
@@ -28,10 +31,19 @@ export function setupPage1(): void {
       })
     }
 
+    // ここからはユーザーがブラウザ側で認証を完了するのを待つフェーズ
+    if (statusText) {
+      statusText.className = 'status-loading'
+      statusText.innerHTML = '<span class="spinner"></span>ブラウザでの認証を待っています...'
+    }
+
     const token = await window.api.poll()
     if (token) {
       if (userCodeText) userCodeText.innerText = ''
-      if (statusText) statusText.innerText = ''
+      if (statusText) {
+        statusText.className = ''
+        statusText.innerText = ''
+      }
       if (copyBtn) copyBtn.style.display = 'none'
       await loadRepoOptions()
       await renderRegisteredRepos()

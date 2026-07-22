@@ -50,7 +50,60 @@ export async function startDiscordOAuth(): Promise<{ id: string; username: strin
 
       // ブラウザに完了メッセージを返す
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end('<h2 style="font-family:sans-serif">認証完了！このタブを閉じてアプリに戻ってください。</h2>')
+      res.end(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>認証完了</title>
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0a0a0f;
+    font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif;
+  }
+  .box {
+    text-align: center;
+    padding: 40px 48px;
+    background: #15151c;
+    border: 0.5px solid #2a2a35;
+    border-radius: 12px;
+    color: #E5E4F0;
+  }
+  .check {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: #22c55e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #ffffff;
+  }
+  h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+  }
+  p {
+    margin: 0;
+    font-size: 13px;
+    color: #8a8a99;
+  }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="check">✓</div>
+    <h2>認証完了！</h2>
+    <p>このタブを閉じてアプリに戻ってください。</p>
+  </div>
+</body>
+</html>`)
       server.close()
 
       if (!code) {

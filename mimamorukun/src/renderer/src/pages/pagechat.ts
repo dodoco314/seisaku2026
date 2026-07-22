@@ -1,3 +1,5 @@
+import { escapeHtml } from '../utils/dom'
+
 export function setupChat(): void {
     const sendBtn = document.getElementById('chat-send-btn')
     const input = document.getElementById('chat-input') as HTMLTextAreaElement
@@ -35,13 +37,25 @@ async function sendMessage(): Promise<void> {
 }
 
 function addMessage(sender: string, text: string): void {
-const chat = document.getElementById('chat')
+    const chat = document.getElementById('chat')
     if (!chat) return
 
-    const p = document.createElement('p')
-    p.style.color = '#000000'
-    const formatted = text.replace(/\n/g, '<br>')
-    p.innerHTML = `<strong>${sender}:</strong> ${formatted}`
-    chat.appendChild(p)
+    const isUser = sender === 'あなた'
+
+    const row = document.createElement('div')
+    row.className = `chat-row ${isUser ? 'chat-row-user' : 'chat-row-bot'}`
+
+    const bubble = document.createElement('div')
+    bubble.className = `chat-bubble ${isUser ? 'chat-bubble-user' : 'chat-bubble-bot'}`
+
+    // XSS対策: sender/text ともにエスケープしてから、こちらで生成した<br>だけ後付けする
+    const senderLabel = isUser
+        ? ''
+        : `<div class="chat-sender-label">${escapeHtml(sender)}</div>`
+    const formatted = escapeHtml(text).replace(/\n/g, '<br>')
+    bubble.innerHTML = `${senderLabel}${formatted}`
+
+    row.appendChild(bubble)
+    chat.appendChild(row)
     chat.scrollTop = chat.scrollHeight
 }
