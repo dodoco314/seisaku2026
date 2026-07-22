@@ -8,8 +8,8 @@ export interface DistortionData {
   distortion: number
 }
 
-let currentDistortionData: DistortionData | null = null
-let currentRepoName: string | null = null
+// let currentDistortionData: DistortionData | null = null
+// let currentRepoName: string | null = null
 
 const CHART_COL_WIDTH = 500
 
@@ -28,23 +28,34 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
 
   try {
     const data = await window.api.calculateDistortion(repoName, guildId)
-    currentDistortionData = data
-    currentRepoName = repoName
+    // currentDistortionData = data
+    // currentRepoName = repoName
 
     const distortionPercent = Math.min(data.distortion, 100)
 
     const track = meterFill.parentElement as HTMLElement | null
-    if (track) {
-      track.style.background = '#1c1c25'
-      track.style.borderRadius = '999px'
-      track.style.overflow = 'hidden'
-      track.style.border = '0.5px solid #2a2a35'
-    }
-    meterFill.style.borderRadius = '999px'
-    meterFill.style.transition = 'width 0.4s ease, background-color 0.4s ease'
     meterFill.style.width = `${distortionPercent}%`
-    meterLabel.innerText = `チームの崩壊度`
+    meterLabel.innerText = `スコア`
+    meterLabel.style.fontSize = '12px'
+    meterLabel.style.color = '#8a8a99'
+    meterLabel.style.fontWeight = '400'
     meterPercent.innerText = `${distortionPercent.toFixed(1)}%`
+
+    if (track) {
+      // 33% / 66% の閾値目盛りを描画（再描画のたびに重複しないよう一度クリアする）
+      track.querySelectorAll('.meter-tick').forEach((el) => el.remove())
+      ;[33, 66].forEach((pos) => {
+        const tick = document.createElement('div')
+        tick.className = 'meter-tick'
+        tick.style.position = 'absolute'
+        tick.style.left = `${pos}%`
+        tick.style.top = '0'
+        tick.style.bottom = '0'
+        tick.style.width = '1px'
+        tick.style.background = 'rgba(255,255,255,0.25)'
+        track.appendChild(tick)
+      })
+    }
 
     if (distortionPercent < 33) {
       meterFill.style.backgroundColor = '#22c55e'
@@ -57,7 +68,7 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
     const sortedEntries = Object.entries(data.scores).sort((a, b) => b[1] - a[1])
     const totalScore = sortedEntries.reduce((sum, [, score]) => sum + score, 0)
     const medals = ['🥇', '🥈', '🥉']
-    const colors = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899']
+    const colors = ['#3b82f6', '#0ea5e9', '#06b6d4', '#6366f1', '#8b5cf6', '#38bdf8']
 
     // 初期表示（貢献度・円グラフ）
     const initialHTML = buildPieChart(sortedEntries, totalScore, medals, colors, data)
@@ -131,7 +142,7 @@ function buildPieChart(
   let startAngle = -Math.PI / 2
   let slices = ''
 
-  entries.forEach(([user, score], index) => {
+  entries.forEach(([, score], index) => {
     const contribution = totalScore > 0 ? score / totalScore : 0
     const angle = contribution * 2 * Math.PI
     const endAngle = startAngle + angle
@@ -155,9 +166,10 @@ function buildPieChart(
   const tableRows = entries.map(([user, score], index) => {
     const contribution = totalScore > 0 ? (score / totalScore) * 100 : 0
     const medal = medals[index] ?? `${index + 1}位`
+    const color = colors[index % colors.length]
     return `<tr style="border-bottom:1px solid #2a2a35;">
       <td style="padding:5px 8px;">${medal}</td>
-      <td style="padding:5px 8px;">${escapeHtml(user)}</td>
+      <td style="padding:5px 8px;"><span style="display:inline-block;width:8px;height:8px;background:${color};border-radius:50%;margin-right:6px;"></span>${escapeHtml(user)}</td>
       <td style="padding:5px 8px;text-align:right;">${contribution.toFixed(1)}%</td>
     </tr>`
   }).join('')
@@ -222,9 +234,10 @@ function buildBarChart(
   const tableRows = entries.map(([user], index) => {
     const val = values[index]
     const medal = medals[index] ?? `${index + 1}位`
+    const color = colors[index % colors.length]
     return `<tr style="border-bottom:1px solid #2a2a35;">
       <td style="padding:5px 8px;">${medal}</td>
-      <td style="padding:5px 8px;">${escapeHtml(user)}</td>
+      <td style="padding:5px 8px;"><span style="display:inline-block;width:8px;height:8px;background:${color};border-radius:50%;margin-right:6px;"></span>${escapeHtml(user)}</td>
       <td style="padding:5px 8px;text-align:right;">${val}${unit}</td>
     </tr>`
   }).join('')
