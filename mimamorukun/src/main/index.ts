@@ -1,21 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import * as dotenv from 'dotenv'
-
-// ビルド後はresources/.envを読み込む、開発時は.envを読み込む
-
-  const envPath = app.isPackaged
-  ? join(process.resourcesPath, '.env')
-  : join(__dirname, '../../.env')
-
-    console.log('[env] isPackaged:', app.isPackaged)
-    console.log('[env] envPath:', envPath)
-    console.log('[env] GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID)
-
-    dotenv.config({ path: envPath })
-
-    console.log('[env] after dotenv GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID)
-
+import * as keytar from 'keytar'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { readFileSync } from 'fs'
 import icon from '../../resources/icon.png?asset'
@@ -34,14 +20,51 @@ import {
   saveAccountLink,
   saveGithubUsersToDB,
   calcDiscordScores,
-  openBotInviteUrl
-} from './discord'
-import {
+  openBotInviteUrl,
   startDiscordOAuth,
   getSavedDiscordUser,
   deleteDiscordToken,
   getMyGuilds
 } from './discord'
+
+// ビルド後はresources/.envを読み込む、開発時は.envを読み込む
+const envPath = app.isPackaged
+  ? join(process.resourcesPath, '.env')
+  : join(__dirname, '../../.env')
+
+console.log('[env] isPackaged:', app.isPackaged)
+console.log('[env] envPath:', envPath)
+console.log('[env] GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID)
+
+dotenv.config({ path: envPath })
+
+console.log('[env] after dotenv GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID)
+
+
+// ─── アンインストール時のトークン削除 ──────────────────
+if (process.argv.includes('--cleanup-credentials')) {
+  app.whenReady().then(async () => {
+    try {
+      // keytarのトークンを削除
+      await keytar.deletePassword('mimamorukun', 'github_token')
+      await keytar.deletePassword('mimamorukun-discord', 'discord_token')
+      await keytar.deletePassword('mimamorukun-discord', 'oauth_state')
+      console.log('[cleanup] トークン削除完了')
+
+      // AppData内のファイルを削除
+      const { rmSync, existsSync } = await import('fs')
+      const userDataPath = app.getPath('userData')
+      if (existsSync(userDataPath)) {
+        rmSync(userDataPath, { recursive: true, force: true })
+        console.log('[cleanup] AppDataフォルダ削除完了:', userDataPath)
+      }
+    } catch (e) {
+      console.error('[cleanup] クリーンアップ失敗:', e)
+    }
+    app.exit(0)
+  })
+} else {
+
 
 // ─── みまもるくん チャット系 ──────────────────────────
 
@@ -104,6 +127,7 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.electron')
@@ -373,3 +397,5 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+
+}
