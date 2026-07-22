@@ -1,5 +1,4 @@
 import { showPage } from '../utils/dom'
-import { renderDistortionMeter } from './pageresult'
 import { initDiscordFlow } from './pagedis1'
 
 // グローバル変数でリポジトリ名を保持

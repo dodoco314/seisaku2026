@@ -8,9 +8,6 @@ export interface DistortionData {
   distortion: number
 }
 
-// let currentDistortionData: DistortionData | null = null
-// let currentRepoName: string | null = null
-
 const CHART_COL_WIDTH = 500
 
 export async function renderDistortionMeter(repoName: string, guildId?: string): Promise<void> {
@@ -28,8 +25,7 @@ export async function renderDistortionMeter(repoName: string, guildId?: string):
 
   try {
     const data = await window.api.calculateDistortion(repoName, guildId)
-    // currentDistortionData = data
-    // currentRepoName = repoName
+    
 
     const distortionPercent = Math.min(data.distortion, 100)
 
@@ -133,7 +129,7 @@ function buildPieChart(
   totalScore: number,
   medals: string[],
   colors: string[],
-  data: any
+  _data: any
 ): string {
   const size = 150
   const cx = size / 2
@@ -142,7 +138,7 @@ function buildPieChart(
   let startAngle = -Math.PI / 2
   let slices = ''
 
-  entries.forEach(([, score], index) => {
+  entries.forEach(([_user, score], index) => {
     const contribution = totalScore > 0 ? score / totalScore : 0
     const angle = contribution * 2 * Math.PI
     const endAngle = startAngle + angle

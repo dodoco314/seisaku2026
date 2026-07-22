@@ -1,11 +1,14 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import * as dotenv from 'dotenv'
+import * as keytar from 'keytar'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { readFileSync } from 'fs'
 import icon from '../../resources/icon.png?asset'
-import { startOAuthFlow, getSavedToken, deleteToken, pollForToken } from './auth'
+import { startOAuthFlow, getSavedToken, deleteToken, pollForToken, getGithubAccessToken } from './auth'
 import { getRepositories, fetchAndSaveData, getOutputPath, calculateDistortion } from './github'
 import { loadRepos, addRepo, removeRepo } from './repos'
+import { setupOllama } from './ollama'
 import {
   initDiscordTables,
   getAvailableServers,
@@ -17,15 +20,51 @@ import {
   saveAccountLink,
   saveGithubUsersToDB,
   calcDiscordScores,
-  openBotInviteUrl
-} from './discord'
-import {
+  openBotInviteUrl,
   startDiscordOAuth,
-  getSavedDiscordToken,
   getSavedDiscordUser,
   deleteDiscordToken,
   getMyGuilds
-} from './discordAuth'
+} from './discord'
+
+// ビルド後はresources/.envを読み込む、開発時は.envを読み込む
+const envPath = app.isPackaged
+  ? join(process.resourcesPath, '.env')
+  : join(__dirname, '../../.env')
+
+console.log('[env] isPackaged:', app.isPackaged)
+console.log('[env] envPath:', envPath)
+console.log('[env] GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID)
+
+dotenv.config({ path: envPath })
+
+console.log('[env] after dotenv GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID)
+
+
+// ─── アンインストール時のトークン削除 ──────────────────
+if (process.argv.includes('--cleanup-credentials')) {
+  app.whenReady().then(async () => {
+    try {
+      // keytarのトークンを削除
+      await keytar.deletePassword('mimamorukun', 'github_token')
+      await keytar.deletePassword('mimamorukun-discord', 'discord_token')
+      await keytar.deletePassword('mimamorukun-discord', 'oauth_state')
+      console.log('[cleanup] トークン削除完了')
+
+      // AppData内のファイルを削除
+      const { rmSync, existsSync } = await import('fs')
+      const userDataPath = app.getPath('userData')
+      if (existsSync(userDataPath)) {
+        rmSync(userDataPath, { recursive: true, force: true })
+        console.log('[cleanup] AppDataフォルダ削除完了:', userDataPath)
+      }
+    } catch (e) {
+      console.error('[cleanup] クリーンアップ失敗:', e)
+    }
+    app.exit(0)
+  })
+} else {
+
 
 // ─── みまもるくん チャット系 ──────────────────────────
 
@@ -35,21 +74,28 @@ ipcMain.handle('chat:send', async (_, message: string, userId: string = 'default
   if (!chatHistories[userId]) chatHistories[userId] = []
   chatHistories[userId].push({ role: 'user', content: message })
 
-  const response = await fetch('http://localhost:11434/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'mimamoru',
-      messages: chatHistories[userId],
-      stream: false
+  try {
+    const response = await fetch('http://localhost:11434/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'mimamoru',
+        messages: chatHistories[userId],
+        stream: false
+      })
     })
-  })
 
-  const data = await response.json()
-  const reply = data.message.content
-  chatHistories[userId].push({ role: 'assistant', content: reply })
+    if (!response.ok) {
+      return 'AIに接続できませんでした。Ollamaがインストールされているか確認してください。'
+    }
 
-  return reply
+    const data = await response.json()
+    const reply = data.message.content
+    chatHistories[userId].push({ role: 'assistant', content: reply })
+    return reply
+  } catch {
+    return 'AIに接続できませんでした。以下の手順でOllamaをインストールしてください：\n1. https://ollama.com からOllamaをインストール\n2. アプリを再起動'
+  }
 })
 
 
@@ -82,6 +128,7 @@ function createWindow(): void {
   }
 }
 
+
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.electron')
 
@@ -96,6 +143,18 @@ app.whenReady().then(async () => {
     console.error('[discord] テーブル初期化失敗:', e)
   }
 
+  // Ollamaの自動セットアップ
+  try {
+    const ollamaResult = await setupOllama()
+    console.log('[ollama]', ollamaResult.message)
+    if (ollamaResult.status === 'not_installed') {
+      // Ollamaが未インストールの場合はインストールページを開く
+      shell.openExternal('https://ollama.com/download')
+    }
+  } catch (e) {
+    console.error('[ollama] セットアップ失敗:', e)
+  }
+
   // ─── GitHub認証系 ──────────────────────────────────
   // 保存済みトークンを取得
   ipcMain.handle('auth:getToken', async () => await getSavedToken())
@@ -108,11 +167,11 @@ app.whenReady().then(async () => {
 
   // ─── リポジトリ管理系 ──────────────────────────────
   // GitHubからリポジトリ一覧を取得
-  ipcMain.handle('repos:getAll', async () => {
-    const token = await getSavedToken()
-    if (!token) throw new Error('未認証です')
-    return await getRepositories(token)
-  })
+ ipcMain.handle('repos:getAll', async () => {
+  const token = await getGithubAccessToken()
+  if (!token) throw new Error('未認証です')
+  return await getRepositories(token)
+})
   // 登録済みリポジトリを取得
   ipcMain.handle('repos:load', () => loadRepos())
   // リポジトリを追加
@@ -123,11 +182,11 @@ app.whenReady().then(async () => {
   // ─── データ取得系 ──────────────────────────────────
   // 選択したリポジトリのデータを取得してJSONに保存
   ipcMain.handle('github:fetch', async (_, selectedRepos: string[]) => {
-    const token = await getSavedToken()
-    if (!token) throw new Error('未認証です')
-    await fetchAndSaveData(token, selectedRepos)
-    return getOutputPath()
-  })
+  const token = await getGithubAccessToken()
+  if (!token) throw new Error('未認証です')
+  await fetchAndSaveData(token, selectedRepos)
+  return getOutputPath()
+})
 
   // ─── 締め切り日管理系 ──────────────────────────────
 
@@ -135,7 +194,7 @@ app.whenReady().then(async () => {
 ipcMain.handle('deadline:save', async (_, dateStr: string) => {
   const path = await import('path')
   const fs = await import('fs')
-  const deadlinePath = path.join(app.getAppPath(), 'deadline.json')
+  const deadlinePath = path.join(app.getPath('userData'), 'deadline.json')
   fs.writeFileSync(deadlinePath, JSON.stringify({ deadline: dateStr }), 'utf-8')
 })
 
@@ -143,7 +202,7 @@ ipcMain.handle('deadline:save', async (_, dateStr: string) => {
 ipcMain.handle('deadline:load', async () => {
   const path = await import('path')
   const fs = await import('fs')
-  const deadlinePath = path.join(app.getAppPath(), 'deadline.json')
+  const deadlinePath = path.join(app.getPath('userData'), 'deadline.json')
   if (!fs.existsSync(deadlinePath)) return null
   const data = JSON.parse(fs.readFileSync(deadlinePath, 'utf-8'))
   return data.deadline
@@ -338,3 +397,5 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+
+}

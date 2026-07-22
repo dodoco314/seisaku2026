@@ -11,6 +11,11 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+extraResources:
+  - from: .env.production
+    to: .env
+  - from: Modelfile
+    to: resources/Modelfile
 win:
   executableName: mimamorukun
 nsis:
