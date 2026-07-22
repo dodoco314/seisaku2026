@@ -51,21 +51,28 @@ ipcMain.handle('chat:send', async (_, message: string, userId: string = 'default
   if (!chatHistories[userId]) chatHistories[userId] = []
   chatHistories[userId].push({ role: 'user', content: message })
 
-  const response = await fetch('http://localhost:11434/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'mimamoru',
-      messages: chatHistories[userId],
-      stream: false
+  try {
+    const response = await fetch('http://localhost:11434/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'mimamoru',
+        messages: chatHistories[userId],
+        stream: false
+      })
     })
-  })
 
-  const data = await response.json()
-  const reply = data.message.content
-  chatHistories[userId].push({ role: 'assistant', content: reply })
+    if (!response.ok) {
+      return 'AIに接続できませんでした。Ollamaがインストールされているか確認してください。'
+    }
 
-  return reply
+    const data = await response.json()
+    const reply = data.message.content
+    chatHistories[userId].push({ role: 'assistant', content: reply })
+    return reply
+  } catch {
+    return 'AIに接続できませんでした。以下の手順でOllamaをインストールしてください：\n1. https://ollama.com からOllamaをインストール\n2. アプリを再起動'
+  }
 })
 
 
