@@ -188,6 +188,78 @@
         color: #8a8a99;
         font-size: 13px;
       }
+
+      /* ─── ここから: 既存のHTML構造はそのまま、CSSだけでカード風に ─── */
+
+      /* 各ページの外枠そのものをカードとして扱う（新しいdivは追加しない） */
+      #pagegit1, #pagegit2, #pagegit3,
+      #discordLogin, #pagedis1, #pagedis2, #pagedis3 {
+        max-width: 480px;
+        margin: 40px auto;
+        padding: 32px;
+        background: #15151c;
+        border: 0.5px solid #2a2a35;
+        border-radius: 12px;
+      }
+      #pagedis3 { max-width: 640px; }
+
+      #pagegit1 h2, #pagegit2 h2, #pagegit3 h2,
+      #discordLogin h2, #pagedis1 h2, #pagedis2 h2, #pagedis3 h2 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      #pagegit2 h3, #pagegit3 h3 {
+        font-size: 13px;
+        font-weight: 400;
+        color: #8a8a99;
+        margin: 0 0 12px;
+      }
+
+      /* 説明文（id無しの<p>）を控えめな色に */
+      .page > p:not([id]) {
+        color: #8a8a99;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      /* 主要アクションのボタンだけアクセントカラーに（既存のidをそのまま利用） */
+      #loginBtn, #toPage3Btn, #fetchBtn, #discordLoginBtn,
+      #selectServerBtn, #botRegisteredBtn, #saveLinkBtn {
+        background: #3b82f6;
+        border-color: #3b82f6;
+        color: #ffffff;
+        font-weight: 600;
+        width: 100%;
+        margin: 8px 0;
+      }
+      #loginBtn:hover, #toPage3Btn:hover, #fetchBtn:hover, #discordLoginBtn:hover,
+      #selectServerBtn:hover, #botRegisteredBtn:hover, #saveLinkBtn:hover {
+        background: #2563eb;
+      }
+
+      /* 認証コード表示（#userCode自体を箱っぽく見せる） */
+      #userCode {
+        display: block;
+        margin: 12px 0;
+        padding: 16px;
+        background: #1c1c25;
+        border: 0.5px solid #2a2a35;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      /* リポジトリ・リポジトリ確認リストの行をカード風に（JSが生成する<li>をそのまま対象） */
+      #registeredList li, #checkList li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        background: #1c1c25;
+        border: 0.5px solid #2a2a35;
+        border-radius: 6px;
+      }
+
+      /* ─── ここまで ─── */
     </style>
   </head>
 
