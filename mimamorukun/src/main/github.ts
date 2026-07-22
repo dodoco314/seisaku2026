@@ -133,11 +133,11 @@ export function calculateDistortion(
 
     if (discordScore !== null) {
       // GitHubとDiscord両方ある場合
-      scores[user] = githubScore * 0.5 + discordScore * 0.5
-    } else {
+      scores[user] = githubScore * 0.7 + discordScore * 0.3
+      } else {
       // GitHubのみの場合
-      scores[user] = githubScore * 0.5
-    }
+      scores[user] = githubScore * 0.1
+      }
   }
 
   // Discordのみのユーザーを追加（除外リストに含まれない場合のみ）
@@ -145,7 +145,7 @@ export function calculateDistortion(
     for (const user of Object.keys(discordScores)) {
       if (excludedUsers?.includes(user)) continue
       if (!scores[user]) {
-        scores[user] = discordScores[user] * 0.5
+        scores[user] = discordScores[user] * 0.1
       }
     }
   }
