@@ -27,10 +27,7 @@ async function proceedAfterLogin(): Promise<void> {
   const settings = await window.api.discord.getSettings(selectedRepoName)
 
   if (settings?.guild_id) {
-    // ⚠️ 脆弱性修正: 過去に誰かが登録したサーバーだからといって、
-    // 「今ログインしているDiscordユーザーが実際にそのサーバーのメンバーか」は別問題。
-    // ここを確認せずに素通りさせると、サーバーに所属していない/退会した人でも
-    // 紐付け・スコアデータに到達できてしまうため、必ずメンバーシップを検証する。
+
     const myServers = await window.api.discord.getMyAvailableServers()
     const isMember = myServers.some((s) => s.guild_id === settings.guild_id)
 
@@ -89,7 +86,7 @@ async function renderServerList(): Promise<void> {
       li.innerHTML = `
         <label class="server-item">
           <input type="radio" name="serverRadio" class="serverRadio"
-                 value="${server.guild_id}" data-name="${server.guild_name}" />
+              value="${server.guild_id}" data-name="${server.guild_name}" />
           <span><strong>${server.guild_name}</strong>（メッセージ数: ${server.message_count}）</span>
         </label>
       `
@@ -132,7 +129,6 @@ export async function renderBotConfirmPage(): Promise<void> {
 export async function goToLinkingPage(): Promise<void> {
   try {
     // 最新のコントリビューター一覧を取得し、account_linksに無いユーザーだけ差分追加する
-    // （saveGithubUsers側はON CONFLICT DO NOTHINGなので、毎回呼んでも既存の紐付けは壊れない）
     const distortion = await window.api.calculateDistortion(selectedRepoName)
     const githubUsernames = Object.keys(distortion.scores)
     await window.api.discord.saveGithubUsers(selectedRepoName, githubUsernames)

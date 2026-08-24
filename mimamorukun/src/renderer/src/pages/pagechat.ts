@@ -48,7 +48,7 @@ function addMessage(sender: string, text: string): void {
     const bubble = document.createElement('div')
     bubble.className = `chat-bubble ${isUser ? 'chat-bubble-user' : 'chat-bubble-bot'}`
 
-    // XSS対策: sender/text ともにエスケープしてから、こちらで生成した<br>だけ後付けする
+    // XSS対策
     const senderLabel = isUser
         ? ''
         : `<div class="chat-sender-label">${escapeHtml(sender)}</div>`

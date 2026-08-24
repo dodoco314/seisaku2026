@@ -72,7 +72,6 @@ export function setupPage2(): void {
   })
 
   // 次へボタン
-  // 次へボタン
 toPage3Btn?.addEventListener('click', async () => {
   await renderCheckList()
   showPage('pagegit3')
