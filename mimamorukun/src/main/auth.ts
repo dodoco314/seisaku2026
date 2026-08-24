@@ -4,7 +4,7 @@ import * as keytar from 'keytar'
 const SCOPE = 'read:org,repo'
 const SERVICE_NAME = 'mimamorukun'
 const ACCOUNT_NAME = 'github_token'
-const SERVER_URL = 'https://mimamorukuntokensaver-production-df1e.up.railway.app'
+const SERVER_URL = 'https://mimamorukuntokensaver-production.up.railway.app'
 
 // dotenv.config()より後に実行されるよう関数で取得
 function getClientId(): string {

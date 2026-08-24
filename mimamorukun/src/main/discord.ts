@@ -9,7 +9,7 @@ function getDiscordClientId(): string {
 }
 const KEYTAR_SERVICE = 'mimamorukun-discord'
 const KEYTAR_ACCOUNT = 'discord_token'
-const SERVER_URL = 'https://mimamorukuntokensaver-production-df1e.up.railway.app'
+const SERVER_URL = 'https://mimamorukuntokensaver-production.up.railway.app'
 
 // ─── テーブル初期化（サーバー側で管理するため不要になったが互換性のために残す） ──
 export async function initDiscordTables(): Promise<void> {
